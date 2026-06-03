@@ -5,15 +5,17 @@
 - Cloudflare account with Workers access.
 - Wrangler CLI installed.
 - Authenticated Wrangler session.
-- GitHub PAT with read-only permissions for upstream access.
+- Optional but recommended: GitHub PAT with read-only permissions for upstream access.
 
-## Configure Secret
+## Configure Secret (Optional, Recommended)
 
 Store token in Cloudflare, never in repository files:
 
 ```bash
 wrangler secret put GITHUB_TOKEN
 ```
+
+The Worker also works without this secret for public upstream content, but authenticated requests are more resilient to upstream rate limits.
 
 ## Deploy
 

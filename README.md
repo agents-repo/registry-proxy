@@ -15,9 +15,18 @@ Setup:
 nvm use
 corepack enable
 corepack prepare npm@11.12.1 --activate
+node --version
+npm --version
 npm ci
 npm run env:check
 ```
+
+Expected version output before continuing:
+
+- Node.js: `v24.15.0`
+- npm: `11.12.1`
+
+If npm still resolves to a different version, ensure Corepack-managed npm is active in your shell before running project scripts.
 
 Validation commands:
 
@@ -61,7 +70,7 @@ If no ref is provided for a file request, the Worker returns a `400` JSON respon
 ## Deploy
 
 1. Install Wrangler and authenticate with Cloudflare.
-2. Set the GitHub token as a secret:
+2. Optional but recommended: set a GitHub token secret for higher upstream reliability and rate-limit headroom:
    - `wrangler secret put GITHUB_TOKEN`
 3. Deploy:
    - `./scripts/deploy.sh`

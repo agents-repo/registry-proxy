@@ -2,6 +2,20 @@
 
 This project uses an issue-first workflow with GitHub CLI.
 
+## 0. Bootstrap Local Runtime
+
+Run the pinned runtime setup before validation commands:
+
+```bash
+nvm use
+corepack enable
+corepack prepare npm@11.12.1 --activate
+npm --version
+npm run env:check
+```
+
+Continue only when npm resolves to `11.12.1`.
+
 ## 1. Create Issue
 
 ```bash
