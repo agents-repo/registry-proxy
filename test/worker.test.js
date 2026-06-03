@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-
-import {
+import worker, {
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
@@ -113,4 +112,89 @@ test("buildUpstreamUrl always targets agents-repo/registry", () => {
     buildUpstreamUrl("feature/my-branch", "/packages/index.json"),
     "https://raw.githubusercontent.com/agents-repo/registry/feature/my-branch/packages/index.json",
   );
+});
+
+test("fetch rejects unsupported methods", async () => {
+  const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json", { method: "POST" }), {}, { waitUntil() {} });
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get("Allow"), "GET");
+});
+
+test("fetch returns usage and missing_ref responses", async () => {
+  const ctx = { waitUntil() {} };
+
+  const usage = await worker.fetch(new Request("https://worker.example/main"), {}, ctx);
+  assert.equal(usage.status, 200);
+  const usageBody = await usage.json();
+  assert.equal(usageBody.repository, "agents-repo/registry");
+
+  const missingRef = await worker.fetch(new Request("https://worker.example/packages/index.json"), {}, ctx);
+  assert.equal(missingRef.status, 400);
+  const missingRefBody = await missingRef.json();
+  assert.equal(missingRefBody.error, "missing_ref");
+});
+
+test("fetch returns invalid_path for unsafe inputs", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/packages/index.json?ref=%252e%252e/other/main"),
+    {},
+    { waitUntil() {} },
+  );
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.equal(body.error, "invalid_path");
+});
+
+test("fetch returns cached response when cache key exists", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cachedResponse = new Response("cached", { status: 200 });
+    globalThis.caches = {
+      default: {
+        async match() {
+          return cachedResponse;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => {
+      throw new Error("fetch should not be called on cache hit");
+    };
+
+    const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json"), {}, { waitUntil() {} });
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "cached");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch returns 502 when upstream fetch throws", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => {
+      throw new Error("network error");
+    };
+
+    const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json"), {}, { waitUntil() {} });
+    assert.equal(response.status, 502);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
 });

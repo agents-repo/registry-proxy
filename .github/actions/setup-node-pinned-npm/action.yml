@@ -14,7 +14,7 @@ runs:
       shell: bash
       run: |
         corepack enable
-        PACKAGE_MANAGER="$(node -p "require('./package.json').packageManager")"
+        PACKAGE_MANAGER="$(node -p 'require("./package.json").packageManager')"
         case "$PACKAGE_MANAGER" in
           npm@*) ;;
           *)
