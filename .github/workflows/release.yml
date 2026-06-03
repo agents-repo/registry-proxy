@@ -44,7 +44,7 @@ jobs:
 
   release-dry-run:
     name: Release Dry Run
-    if: github.event_name == 'workflow_dispatch' && inputs.dry_run == 'true' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs:
       - validate
@@ -68,7 +68,7 @@ jobs:
     name: Publish GitHub Release
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.dry_run == 'false' && github.ref == 'refs/heads/main')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     needs:
       - validate
