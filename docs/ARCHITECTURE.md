@@ -2,27 +2,28 @@
 
 ## Goal
 
-Proxy registry files from GitHub Raw through Cloudflare Workers with caching and optional upstream authentication.
+Proxy registry files through Cloudflare Workers with caching, using GitHub Raw by default and the GitHub Contents API for authenticated upstream access.
 
 ## Request Lifecycle
 
 1. Client requests a registry path on workers.dev.
 2. Worker normalizes the path and builds the upstream URL.
 3. Worker checks `caches.default` by resolved upstream URL.
-4. On miss, Worker fetches GitHub Raw with optional token auth.
+4. On miss, Worker fetches GitHub Raw when no token is present, or GitHub Contents API with `Accept: application/vnd.github.raw` when `GITHUB_TOKEN` is present.
 5. Worker returns upstream response and caches successful results.
 
 ## Components
 
 - Worker runtime: request parsing, mapping, fetch, response handling.
 - Cloudflare edge cache: response reuse for repeated GET requests.
-- Cloudflare secret: `GITHUB_TOKEN` for authenticated GitHub Raw access.
+- Cloudflare secret: `GITHUB_TOKEN` for authenticated GitHub Contents API access.
 
 ## Path Mapping
 
 - Incoming path: `/main/packages/index.json`
 - Upstream base: `https://raw.githubusercontent.com/agents-repo/registry`
 - Resolved upstream: `https://raw.githubusercontent.com/agents-repo/registry/main/packages/index.json`
+- Authenticated upstream (when token exists): `https://api.github.com/repos/agents-repo/registry/contents/packages/index.json?ref=main`
 
 ## Method Policy
 

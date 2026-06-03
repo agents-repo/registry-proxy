@@ -1,6 +1,6 @@
 # registry-proxy
 
-Cloudflare Worker proxy for files in the GitHub repository agents-repo/registry only. It forwards read requests to GitHub Raw, applies edge caching, and optionally authenticates upstream requests with a GitHub token stored as a Cloudflare secret.
+Cloudflare Worker proxy for files in the GitHub repository agents-repo/registry only. It forwards read requests to GitHub Raw by default, applies edge caching, and optionally uses the GitHub Contents API with a GitHub token stored as a Cloudflare secret.
 
 ## Development Environment
 
@@ -48,14 +48,11 @@ Scope is intentionally strict:
 
 ## How It Works
 
-1. A request hits the Worker endpoint in one of the supported formats:
-   - `/<ref>/<path>`
-   - `/<path>?ref=<ref>`
-2. The Worker maps the request to the upstream GitHub Raw URL:
-   - `https://raw.githubusercontent.com/agents-repo/registry/<ref>/<path>`
-3. The Worker checks `caches.default` for a cached response.
-4. On cache miss, it fetches upstream with `Authorization: token <GITHUB_TOKEN>` when the secret exists.
-5. Successful upstream responses with status 200 are cached and returned to the caller.
+1. A request hits the Worker endpoint in one of the supported formats: `/<ref>/<path>` or `/<path>?ref=<ref>`.
+1. The Worker maps the request to upstream content: `https://raw.githubusercontent.com/agents-repo/registry/<ref>/<path>`, or when `GITHUB_TOKEN` is present, `https://api.github.com/repos/agents-repo/registry/contents/<path>?ref=<ref>` with `Accept: application/vnd.github.raw`.
+1. The Worker checks `caches.default` for a cached response.
+1. On cache miss, it fetches upstream without Authorization for GitHub Raw, or with `Authorization: Bearer <GITHUB_TOKEN>` and `Accept: application/vnd.github.raw` for the Contents API.
+1. Successful upstream responses with status 200 are cached and returned to the caller.
 
 Guidance routes:
 

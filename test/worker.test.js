@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker, {
+  buildContentsApiUrl,
+  buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
@@ -121,6 +123,37 @@ test("buildUpstreamUrl always targets agents-repo/registry", () => {
   );
 });
 
+test("buildContentsApiUrl targets GitHub Contents API with ref query", () => {
+  assert.equal(
+    buildContentsApiUrl("main", "packages/index.json"),
+    "https://api.github.com/repos/agents-repo/registry/contents/packages/index.json?ref=main",
+  );
+  assert.equal(
+    buildContentsApiUrl("feature/my-branch", "/packages/index.json"),
+    "https://api.github.com/repos/agents-repo/registry/contents/packages/index.json?ref=feature%2Fmy-branch",
+  );
+});
+
+test("buildUpstreamRequest uses raw host without token and Contents API with token", () => {
+  const target = { ref: "main", targetPath: "packages/index.json" };
+
+  const unauthenticated = buildUpstreamRequest(target, {}, new Headers({ Accept: "application/json" }));
+  assert.equal(
+    unauthenticated.url,
+    "https://raw.githubusercontent.com/agents-repo/registry/main/packages/index.json",
+  );
+  assert.equal(unauthenticated.headers.get("Accept"), "application/json");
+  assert.equal(unauthenticated.headers.has("Authorization"), false);
+
+  const authenticated = buildUpstreamRequest(target, { GITHUB_TOKEN: "token-value" }, new Headers({ Accept: "application/json" }));
+  assert.equal(
+    authenticated.url,
+    "https://api.github.com/repos/agents-repo/registry/contents/packages/index.json?ref=main",
+  );
+  assert.equal(authenticated.headers.get("Accept"), "application/vnd.github.raw");
+  assert.equal(authenticated.headers.get("Authorization"), "Bearer token-value");
+});
+
 test("fetch rejects unsupported methods", async () => {
   const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json", { method: "POST" }), {}, { waitUntil() {} });
   assert.equal(response.status, 405);
@@ -200,6 +233,64 @@ test("fetch returns 502 when upstream fetch throws", async () => {
 
     const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json"), {}, { waitUntil() {} });
     assert.equal(response.status, 502);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch caches upstream 200 on miss and serves subsequent hit", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const cacheWrites = [];
+    let fetchCount = 0;
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheWrites.push(request.url);
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response("upstream", {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
+    };
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    };
+
+    const request = new Request("https://worker.example/main/packages/index.json");
+
+    const firstResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(firstResponse.status, 200);
+    assert.equal(await firstResponse.text(), "upstream");
+    assert.equal(fetchCount, 1);
+    assert.equal(waitUntilPromises.length, 1);
+    await Promise.all(waitUntilPromises);
+    assert.equal(cacheWrites.length, 1);
+
+    const secondResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(secondResponse.status, 200);
+    assert.equal(await secondResponse.text(), "upstream");
+    assert.equal(fetchCount, 1);
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;

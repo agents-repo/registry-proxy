@@ -1,6 +1,7 @@
 const REPO_OWNER = "agents-repo";
 const REPO_NAME = "registry";
 const RAW_BASE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}`;
+const CONTENTS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 
@@ -200,7 +201,35 @@ function buildUpstreamUrl(ref, targetPath) {
   return `${RAW_BASE_URL}/${encodeRef(ref)}/${normalizedPath}`;
 }
 
+function buildContentsApiUrl(ref, targetPath) {
+  const normalizedPath = targetPath.replace(/^\/+/, "");
+  return `${CONTENTS_API_BASE_URL}/${normalizedPath}?ref=${encodeURIComponent(ref)}`;
+}
+
+function buildUpstreamRequest(target, env, requestHeaders) {
+  const headers = new Headers();
+  const requestAccept = requestHeaders.get("Accept") || "*/*";
+
+  if (env.GITHUB_TOKEN) {
+    headers.set("Accept", "application/vnd.github.raw");
+    headers.set("Authorization", `Bearer ${env.GITHUB_TOKEN}`);
+    return {
+      url: buildContentsApiUrl(target.ref, target.targetPath),
+      headers,
+    };
+  }
+
+  headers.set("Accept", requestAccept);
+
+  return {
+    url: buildUpstreamUrl(target.ref, target.targetPath),
+    headers,
+  };
+}
+
 export {
+  buildContentsApiUrl,
+  buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
@@ -233,7 +262,8 @@ export default {
       return invalidPathResponse();
     }
 
-    const upstreamUrl = buildUpstreamUrl(target.ref, target.targetPath);
+    const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
+    const upstreamUrl = upstreamRequest.url;
 
     const cache = caches.default;
     const cacheKey = new Request(upstreamUrl, { method: "GET" });
@@ -242,18 +272,11 @@ export default {
       return cached;
     }
 
-    const upstreamHeaders = new Headers();
-    upstreamHeaders.set("Accept", request.headers.get("Accept") || "*/*");
-
-    if (env.GITHUB_TOKEN) {
-      upstreamHeaders.set("Authorization", `token ${env.GITHUB_TOKEN}`);
-    }
-
     let upstreamResponse;
     try {
       upstreamResponse = await fetch(upstreamUrl, {
         method: "GET",
-        headers: upstreamHeaders,
+        headers: upstreamRequest.headers,
         cf: {
           cacheEverything: true,
         },
