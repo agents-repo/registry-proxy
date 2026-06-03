@@ -28,6 +28,7 @@ test("normalizeRef trims boundary slashes and rejects traversal", () => {
   assert.equal(normalizeRef("../main"), null);
   assert.equal(normalizeRef("%2e%2e/main"), null);
   assert.equal(normalizeRef("%252e%252e/main"), null);
+  assert.equal(normalizeRef("%2525252e%2525252e/main"), null);
 });
 
 test("splitPathStyle parses ref and target path", () => {

@@ -2,6 +2,7 @@ const REPO_OWNER = "agents-repo";
 const REPO_NAME = "registry";
 const RAW_BASE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}`;
 const KNOWN_CONTENT_ROOTS = ["packages"];
+const MAX_PATH_DECODE_PASSES = 8;
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload, null, 2), {
@@ -67,7 +68,7 @@ function hasUnsafePathSegments(pathValue) {
 function containsPathTraversal(pathValue) {
   let currentValue = pathValue;
 
-  for (let index = 0; index <= 2; index += 1) {
+  for (let index = 0; index < MAX_PATH_DECODE_PASSES; index += 1) {
     if (hasUnsafePathSegments(currentValue)) {
       return true;
     }
@@ -80,7 +81,12 @@ function containsPathTraversal(pathValue) {
     currentValue = decodedValue;
   }
 
-  return false;
+  if (hasUnsafePathSegments(currentValue)) {
+    return true;
+  }
+
+  // If decoding still changes after the safety cap, treat as unsafe input.
+  return decodePathValue(currentValue) !== currentValue;
 }
 
 function normalizePath(pathname) {
