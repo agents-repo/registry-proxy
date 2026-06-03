@@ -44,8 +44,56 @@ function missingRefResponse() {
   }, 400);
 }
 
+function invalidPathResponse() {
+  return jsonResponse({
+    error: "invalid_path",
+    message: "Path contains unsafe segments.",
+  }, 400);
+}
+
+function decodePathValue(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function hasUnsafePathSegments(pathValue) {
+  const segments = pathValue.split("/");
+  return segments.some((segment) => segment === "." || segment === "..");
+}
+
+function containsPathTraversal(pathValue) {
+  let currentValue = pathValue;
+
+  for (let index = 0; index <= 2; index += 1) {
+    if (hasUnsafePathSegments(currentValue)) {
+      return true;
+    }
+
+    const decodedValue = decodePathValue(currentValue);
+    if (decodedValue === currentValue) {
+      break;
+    }
+
+    currentValue = decodedValue;
+  }
+
+  return false;
+}
+
 function normalizePath(pathname) {
-  return (pathname || "/").replace(/^\/+/, "");
+  const normalizedPath = (pathname || "/").replace(/^\/+/, "");
+  if (!normalizedPath) {
+    return "";
+  }
+
+  if (containsPathTraversal(normalizedPath)) {
+    return null;
+  }
+
+  return normalizedPath;
 }
 
 function splitPathStyle(path) {
@@ -65,6 +113,10 @@ function splitPathStyle(path) {
 
 function getProxyTarget(requestUrl) {
   const path = normalizePath(requestUrl.pathname);
+  if (path === null) {
+    return { kind: "invalid_path" };
+  }
+
   if (!path || path === "main" || path === "main/") {
     return { kind: "usage" };
   }
@@ -131,6 +183,10 @@ export default {
 
     if (target.kind === "missing_ref") {
       return missingRefResponse();
+    }
+
+    if (target.kind === "invalid_path") {
+      return invalidPathResponse();
     }
 
     const upstreamUrl = buildUpstreamUrl(target.ref, target.targetPath);

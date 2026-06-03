@@ -15,6 +15,13 @@ test("normalizePath removes only leading slashes", () => {
   assert.equal(normalizePath(""), "");
 });
 
+test("normalizePath rejects traversal segments including encoded variants", () => {
+  assert.equal(normalizePath("/../packages/index.json"), null);
+  assert.equal(normalizePath("/%2e%2e/packages/index.json"), null);
+  assert.equal(normalizePath("/%252e%252e/packages/index.json"), null);
+  assert.equal(normalizePath("/packages/../index.json"), null);
+});
+
 test("splitPathStyle parses ref and target path", () => {
   assert.deepEqual(splitPathStyle("main/packages/index.json"), {
     ref: "main",
@@ -53,6 +60,18 @@ test("getProxyTarget returns missing_ref when no ref can be inferred", () => {
   assert.deepEqual(
     getProxyTarget(new URL("https://worker.example/packages/index.json")),
     { kind: "missing_ref" },
+  );
+});
+
+test("getProxyTarget rejects unsafe traversal paths", () => {
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/main/%252e%252e/packages/index.json")),
+    { kind: "invalid_path" },
+  );
+
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/%252e%252e/packages/index.json?ref=main")),
+    { kind: "invalid_path" },
   );
 });
 
