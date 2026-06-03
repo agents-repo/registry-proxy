@@ -1,0 +1,47 @@
+name: Task or chore
+description: Track maintenance and operational work.
+title: "chore: "
+labels:
+  - chore
+type: Task
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Branch name: `chore/<issue-number>-<short-slug>`
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What needs to be completed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Task list
+      placeholder: |
+        - [ ] Task 1
+        - [ ] Task 2
+    validations:
+      required: true
+
+  - type: textarea
+    id: done-criteria
+    attributes:
+      label: Done criteria
+      description: How will completion be verified?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched for existing similar issues.
+          required: true
+        - label: If I open a PR, I will include Closes #<issue-number> in Related Issues.
+          required: true

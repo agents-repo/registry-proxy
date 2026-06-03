@@ -1,0 +1,33 @@
+name: PR Worker Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - src/**
+      - scripts/**
+      - wrangler.toml
+      - docs/**
+      - .github/**
+
+jobs:
+  worker-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node and pinned npm
+        uses: ./.github/actions/setup-node-pinned-npm
+
+      - name: Validate runtime
+        run: npm run env:check
+
+      - name: Lint JavaScript and Markdown
+        run: npm run lint:all
+
+      - name: Verify deploy script policy
+        run: grep -n "wrangler deploy" scripts/deploy.sh
+
+      - name: Secret scan
+        run: npm run check:secrets
