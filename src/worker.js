@@ -130,6 +130,16 @@ function splitPathStyle(path) {
   return { ref, targetPath };
 }
 
+function isKnownContentPath(pathValue) {
+  for (const root of KNOWN_CONTENT_ROOTS) {
+    if (pathValue === root || pathValue.startsWith(`${root}/`)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function getProxyTarget(requestUrl) {
   const path = normalizePath(requestUrl.pathname);
   if (path === null) {
@@ -147,17 +157,21 @@ function getProxyTarget(requestUrl) {
       return { kind: "invalid_path" };
     }
 
+    let targetPath = path;
+    const pathStyle = splitPathStyle(path);
+    if (pathStyle && isKnownContentPath(pathStyle.targetPath)) {
+      targetPath = pathStyle.targetPath;
+    }
+
     return {
       kind: "proxy",
       ref: normalizedRef,
-      targetPath: path,
+      targetPath,
     };
   }
 
-  for (const root of KNOWN_CONTENT_ROOTS) {
-    if (path === root || path.startsWith(`${root}/`)) {
-      return { kind: "missing_ref" };
-    }
+  if (isKnownContentPath(path)) {
+    return { kind: "missing_ref" };
   }
 
   const pathStyle = splitPathStyle(path);

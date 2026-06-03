@@ -60,12 +60,19 @@ test("getProxyTarget supports both path and query formats", () => {
 test("getProxyTarget applies query-ref precedence when both are present", () => {
   assert.deepEqual(
     getProxyTarget(new URL("https://worker.example/main/packages/index.json?ref=other")),
-    { kind: "proxy", ref: "other", targetPath: "main/packages/index.json" },
+    { kind: "proxy", ref: "other", targetPath: "packages/index.json" },
   );
 
   assert.deepEqual(
     getProxyTarget(new URL("https://worker.example/main/packages/index.json?ref=/other/")),
-    { kind: "proxy", ref: "other", targetPath: "main/packages/index.json" },
+    { kind: "proxy", ref: "other", targetPath: "packages/index.json" },
+  );
+});
+
+test("getProxyTarget keeps full path when mixed format does not map to a known content root", () => {
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/main/README.md?ref=other")),
+    { kind: "proxy", ref: "other", targetPath: "main/README.md" },
   );
 });
 
