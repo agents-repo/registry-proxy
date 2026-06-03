@@ -6,9 +6,8 @@ This project uses an issue-first workflow with GitHub CLI.
 
 ```bash
 gh issue create \
-  --title "Bootstrap registry-proxy worker" \
-  --body "Implements worker proxy, docs, and governance artifacts." \
-  --label "feature"
+  --title "feat: short description" \
+  --body "Scope, acceptance criteria, and validation plan"
 ```
 
 ## 2. Create Branch From Issue Context
@@ -16,13 +15,13 @@ gh issue create \
 Option A:
 
 ```bash
-gh issue develop <issue-number> --name "feat/registry-proxy-bootstrap-<issue-number>"
+gh issue develop <issue-number> --name "feat/<issue-number>-short-slug"
 ```
 
 Option B:
 
 ```bash
-git checkout -b "feat/registry-proxy-bootstrap-<issue-number>"
+git checkout -b "feat/<issue-number>-short-slug"
 ```
 
 ## 3. Open Pull Request
@@ -30,16 +29,30 @@ git checkout -b "feat/registry-proxy-bootstrap-<issue-number>"
 ```bash
 gh pr create \
   --base main \
-  --head "feat/registry-proxy-bootstrap-<issue-number>" \
-  --title "Bootstrap registry-proxy worker" \
-  --body "Fixes #<issue-number>"
+  --head "feat/<issue-number>-short-slug" \
+  --title "feat: short description" \
+  --body-file .github/pull_request_template.md
 ```
+
+Then edit PR body to include:
+
+- `Closes #<issue-number>` in `## Related Issues`
+- Validation evidence from npm commands
 
 ## 4. Review and Merge
 
 ```bash
 gh pr view <pr-number>
 gh pr merge <pr-number> --squash
+```
+
+## 5. Required Local Validation Before Review
+
+```bash
+npm run env:check
+npm run lint:all
+npm run check:secrets
+npm run test
 ```
 
 ## Fallback Without gh

@@ -1,10 +1,37 @@
-# Pull Request Summary
+# Pull Request
 
-Describe what this PR changes.
+## Summary
 
-## Linked Issue
+Describe the change and why it is needed.
 
-Fixes #ISSUE_NUMBER
+## Change Type
+
+- [ ] Feature
+- [ ] Bug fix
+- [ ] Documentation
+- [ ] Tooling or workflow
+- [ ] Maintenance
+
+## Scope
+
+List affected paths:
+
+- [ ] src/
+- [ ] scripts/
+- [ ] docs/
+- [ ] .github/
+- [ ] wrangler.toml
+- [ ] Root config files
+
+## Validation Checklist
+
+- [ ] Runtime check passes (`npm run env:check`).
+- [ ] Lint checks pass (`npm run lint:all`).
+- [ ] Secret scan passes (`npm run check:secrets`).
+- [ ] Test command passes (`npm run test`).
+- [ ] Documentation remains deterministic and clear.
+- [ ] PR follows `.github/pull_request_template.md` sections.
+- [ ] Issue form was used or equivalent required fields were included.
 
 ## Validation Evidence
 
@@ -12,12 +39,11 @@ Fixes #ISSUE_NUMBER
 - Key outputs:
 - Endpoint checks:
 
-## Security Checklist
+## Risk and Rollback
 
-- [ ] No token or secret values committed.
-- [ ] wrangler.toml contains no credentials.
+- Risk level: low / medium / high
+- Rollback plan:
 
-## Documentation Checklist
+## Related Issues
 
-- [ ] README and docs updated when behavior changed.
-- [ ] Contribution/workflow docs remain consistent.
+- Closes #ISSUE_NUMBER

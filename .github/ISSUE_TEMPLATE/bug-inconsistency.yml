@@ -1,0 +1,61 @@
+name: Bug or inconsistency report
+description: Report broken proxy behavior, documentation mismatch, or workflow inconsistency.
+title: "fix: "
+labels:
+  - bug
+type: Bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Branch name: `fix/<issue-number>-<short-slug>`
+
+        If you open a PR for this issue, include `Closes #<issue-number>` in `## Related Issues`.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken or inconsistent?
+    validations:
+      required: true
+
+  - type: input
+    id: affected-file
+    attributes:
+      label: Affected file
+      description: Provide a path if known.
+      placeholder: src/worker.js
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Send request to ...
+        2. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Include command output or response snippets.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I confirmed this issue is reproducible on latest main.
+          required: true
+        - label: I searched for existing related issues.
+          required: true

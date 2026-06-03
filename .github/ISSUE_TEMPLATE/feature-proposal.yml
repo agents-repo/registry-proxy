@@ -1,0 +1,60 @@
+name: Feature proposal
+description: Propose a new capability for registry-proxy.
+title: "feat: "
+labels:
+  - enhancement
+type: Feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Branch name: `feat/<issue-number>-<short-slug>`
+
+        Use this form for new proxy, CI, or governance capabilities.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What feature should be added?
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this needed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope
+      placeholder: |
+        In scope:
+        -
+        Out of scope:
+        -
+    validations:
+      required: true
+
+  - type: textarea
+    id: impacted
+    attributes:
+      label: Impacted areas
+      placeholder: |
+        - src/
+        - .github/
+        - docs/
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I described measurable acceptance criteria.
+          required: true
+        - label: I reviewed existing issues for duplicates.
+          required: true

@@ -59,7 +59,7 @@ export default {
           cacheEverything: true,
         },
       });
-    } catch (error) {
+    } catch {
       return new Response("Bad Gateway", { status: 502 });
     }
 

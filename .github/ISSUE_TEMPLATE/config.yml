@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Registry-proxy usage question
+    url: https://github.com/agents-repo/registry-proxy/discussions
+    about: Ask usage questions and open-ended discussions here.
+  - name: Security vulnerability report
+    url: https://github.com/agents-repo/registry-proxy/security/advisories/new
+    about: Report security vulnerabilities privately through GitHub Security Advisories.

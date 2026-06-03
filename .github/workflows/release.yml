@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run semantic-release in dry-run mode
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Release Inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node and pinned npm
+        uses: ./.github/actions/setup-node-pinned-npm
+
+      - name: Validate runtime
+        run: npm run env:check
+
+      - name: Run baseline checks
+        run: npm run lint:all
+
+      - name: Secret scan
+        run: npm run check:secrets
+
+  release-dry-run:
+    name: Release Dry Run
+    if: github.event_name == 'workflow_dispatch' && inputs.dry_run == true && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs:
+      - validate
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node and pinned npm
+        uses: ./.github/actions/setup-node-pinned-npm
+
+      - name: Run semantic-release dry run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run release:dry-run
+
+  release-publish:
+    name: Publish GitHub Release
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    needs:
+      - validate
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node and pinned npm
+        uses: ./.github/actions/setup-node-pinned-npm
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: semantic-release
