@@ -1,6 +1,6 @@
 # registry-proxy
 
-Cloudflare Worker proxy for the agents-repo package registry. It forwards read requests to GitHub Raw, applies edge caching, and optionally authenticates upstream requests with a GitHub token stored as a Cloudflare secret.
+Cloudflare Worker proxy for files in the GitHub repository agents-repo/registry only. It forwards read requests to GitHub Raw, applies edge caching, and optionally authenticates upstream requests with a GitHub token stored as a Cloudflare secret.
 
 ## Development Environment
 
@@ -31,21 +31,32 @@ npm run test
 
 This project exposes registry content through a Workers endpoint so web clients do not hit GitHub Raw directly. The Worker is read-only by default (GET only), reduces repeated upstream calls through edge caching, and centralizes token handling in Cloudflare.
 
+Scope is intentionally strict:
+
+- Owner is fixed to agents-repo.
+- Repository is fixed to registry.
+- The Worker does not proxy arbitrary GitHub repositories.
+
 ## How It Works
 
-1. A request hits the Worker endpoint, for example `/packages/index.json`.
-2. The Worker maps the path to the upstream GitHub Raw URL.
+1. A request hits the Worker endpoint in one of the supported formats:
+   - `/<ref>/<path>`
+   - `/<path>?ref=<ref>`
+2. The Worker maps the request to the upstream GitHub Raw URL:
+   - `https://raw.githubusercontent.com/agents-repo/registry/<ref>/<path>`
 3. The Worker checks `caches.default` for a cached response.
 4. On cache miss, it fetches upstream with `Authorization: token <GITHUB_TOKEN>` when the secret exists.
-5. Successful upstream responses are cached and returned to the caller.
+5. Successful upstream responses with status 200 are cached and returned to the caller.
 
-Default upstream base URL:
+Guidance routes:
 
-- `https://raw.githubusercontent.com/agents-repo/registry/main`
+- `/`
+- `/main`
+- `/main/`
 
-Optional env override:
+These routes return JSON usage guidance and do not proxy upstream.
 
-- `UPSTREAM_BASE_URL`
+If no ref is provided for a file request, the Worker returns a `400` JSON response with valid usage examples.
 
 ## Deploy
 
@@ -58,6 +69,30 @@ Optional env override:
 
 Detailed deployment and validation steps are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+## Usage Examples
+
+Worker URL pattern:
+
+- `https://<worker>.workers.dev/<ref>/<path>`
+- `https://<worker>.workers.dev/<path>?ref=<ref>`
+
+Examples:
+
+- Main branch:
+  - `https://<worker>.workers.dev/main/packages/index.json`
+  - `https://<worker>.workers.dev/packages/index.json?ref=main`
+- Named branch:
+  - `https://<worker>.workers.dev/packages/index.json?ref=release-2026-06`
+- Tag:
+  - `https://<worker>.workers.dev/packages/index.json?ref=v1.0.0`
+- Commit SHA:
+  - `https://<worker>.workers.dev/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f`
+
+Notes:
+
+- If both path ref and query ref are present, query ref is used.
+- Non-GET methods are rejected with `405 Method Not Allowed`.
+
 ## Release Workflow
 
 - Conventional commit mapping is used for semantic releases.
@@ -67,14 +102,14 @@ Detailed deployment and validation steps are in [docs/DEPLOYMENT.md](docs/DEPLOY
 
 ## Use in Webapp
 
-Point your client to your workers.dev URL, then request registry paths directly:
+Point your client to your workers.dev URL and include a ref using one of the supported formats:
 
-- `/packages/index.json`
-- `/packages//manifest.json`
+- `/main/packages/index.json`
+- `/packages/index.json?ref=main`
 
 Example:
 
-- `https://<worker>.workers.dev/packages/index.json`
+- `https://<worker>.workers.dev/main/packages/index.json`
 
 ## Project Docs
 

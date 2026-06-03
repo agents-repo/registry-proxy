@@ -1,23 +1,117 @@
-const DEFAULT_UPSTREAM_BASE_URL = "https://raw.githubusercontent.com/agents-repo/registry/main";
+const REPO_OWNER = "agents-repo";
+const REPO_NAME = "registry";
+const RAW_BASE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}`;
+const KNOWN_CONTENT_ROOTS = ["packages"];
 
-function normalizePath(pathname) {
-  if (!pathname || pathname === "/") {
-    return "";
-  }
-
-  // Keep intentional internal double slashes, but trim the leading slash for join logic.
-  return pathname.replace(/^\/+/, "");
+function jsonResponse(payload, status = 200) {
+  return new Response(JSON.stringify(payload, null, 2), {
+    status,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+    },
+  });
 }
 
-function buildUpstreamUrl(requestUrl, upstreamBaseUrl) {
-  const path = normalizePath(requestUrl.pathname);
-  if (!path) {
+function usagePayload() {
+  return {
+    message: "Use this Worker to proxy files from agents-repo/registry by ref.",
+    repository: `${REPO_OWNER}/${REPO_NAME}`,
+    supported_formats: [
+      "/<ref>/<path>",
+      "/<path>?ref=<ref>",
+    ],
+    examples: [
+      "/main/packages/index.json",
+      "/packages/index.json?ref=main",
+      "/packages/index.json?ref=release-2026-06",
+      "/packages/index.json?ref=v1.0.0",
+      "/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f",
+    ],
+  };
+}
+
+function usageResponse() {
+  return jsonResponse(usagePayload(), 200);
+}
+
+function missingRefResponse() {
+  return jsonResponse({
+    error: "missing_ref",
+    message: "A ref is required. Use /<ref>/<path> or /<path>?ref=<ref>.",
+    repository: `${REPO_OWNER}/${REPO_NAME}`,
+    supported_formats: usagePayload().supported_formats,
+    examples: usagePayload().examples,
+  }, 400);
+}
+
+function normalizePath(pathname) {
+  return (pathname || "/").replace(/^\/+/, "");
+}
+
+function splitPathStyle(path) {
+  const separatorIndex = path.indexOf("/");
+  if (separatorIndex === -1) {
     return null;
   }
 
-  const base = upstreamBaseUrl.replace(/\/$/, "");
-  return `${base}/${path}`;
+  const ref = path.slice(0, separatorIndex);
+  const targetPath = path.slice(separatorIndex + 1);
+  if (!ref || !targetPath) {
+    return null;
+  }
+
+  return { ref, targetPath };
 }
+
+function getProxyTarget(requestUrl) {
+  const path = normalizePath(requestUrl.pathname);
+  if (!path || path === "main" || path === "main/") {
+    return { kind: "usage" };
+  }
+
+  const queryRef = requestUrl.searchParams.get("ref");
+  if (queryRef) {
+    return {
+      kind: "proxy",
+      ref: queryRef,
+      targetPath: path,
+    };
+  }
+
+  for (const root of KNOWN_CONTENT_ROOTS) {
+    if (path === root || path.startsWith(`${root}/`)) {
+      return { kind: "missing_ref" };
+    }
+  }
+
+  const pathStyle = splitPathStyle(path);
+  if (pathStyle) {
+    return {
+      kind: "proxy",
+      ref: pathStyle.ref,
+      targetPath: pathStyle.targetPath,
+    };
+  }
+
+  return { kind: "missing_ref" };
+}
+
+function encodeRef(ref) {
+  return ref.split("/").map(encodeURIComponent).join("/");
+}
+
+function buildUpstreamUrl(ref, targetPath) {
+  const normalizedPath = targetPath.replace(/^\/+/, "");
+  return `${RAW_BASE_URL}/${encodeRef(ref)}/${normalizedPath}`;
+}
+
+export {
+  buildUpstreamUrl,
+  encodeRef,
+  getProxyTarget,
+  normalizePath,
+  splitPathStyle,
+};
 
 export default {
   async fetch(request, env, ctx) {
@@ -29,15 +123,20 @@ export default {
     }
 
     const requestUrl = new URL(request.url);
-    const upstreamBaseUrl = env.UPSTREAM_BASE_URL || DEFAULT_UPSTREAM_BASE_URL;
-    const upstreamUrl = buildUpstreamUrl(requestUrl, upstreamBaseUrl);
+    const target = getProxyTarget(requestUrl);
 
-    if (!upstreamUrl) {
-      return new Response("Not Found", { status: 404 });
+    if (target.kind === "usage") {
+      return usageResponse();
     }
 
+    if (target.kind === "missing_ref") {
+      return missingRefResponse();
+    }
+
+    const upstreamUrl = buildUpstreamUrl(target.ref, target.targetPath);
+
     const cache = caches.default;
-    const cacheKey = new Request(requestUrl.toString(), { method: "GET" });
+    const cacheKey = new Request(upstreamUrl, { method: "GET" });
     const cached = await cache.match(cacheKey);
     if (cached) {
       return cached;
@@ -70,7 +169,7 @@ export default {
       headers: responseHeaders,
     });
 
-    if (upstreamResponse.ok) {
+    if (upstreamResponse.status === 200) {
       ctx.waitUntil(cache.put(cacheKey, response.clone()));
     }
 
