@@ -36,6 +36,9 @@ jobs:
       - name: Run baseline checks
         run: npm run lint:all
 
+      - name: Run tests
+        run: npm run test
+
       - name: Secret scan
         run: npm run check:secrets
 

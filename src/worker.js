@@ -96,6 +96,19 @@ function normalizePath(pathname) {
   return normalizedPath;
 }
 
+function normalizeRef(refValue) {
+  const normalizedRef = String(refValue || "").replace(/^\/+|\/+$/g, "");
+  if (!normalizedRef) {
+    return null;
+  }
+
+  if (containsPathTraversal(normalizedRef)) {
+    return null;
+  }
+
+  return normalizedRef;
+}
+
 function splitPathStyle(path) {
   const separatorIndex = path.indexOf("/");
   if (separatorIndex === -1) {
@@ -122,10 +135,15 @@ function getProxyTarget(requestUrl) {
   }
 
   const queryRef = requestUrl.searchParams.get("ref");
-  if (queryRef) {
+  if (queryRef !== null) {
+    const normalizedRef = normalizeRef(queryRef);
+    if (!normalizedRef) {
+      return { kind: "invalid_path" };
+    }
+
     return {
       kind: "proxy",
-      ref: queryRef,
+      ref: normalizedRef,
       targetPath: path,
     };
   }
@@ -138,9 +156,14 @@ function getProxyTarget(requestUrl) {
 
   const pathStyle = splitPathStyle(path);
   if (pathStyle) {
+    const normalizedRef = normalizeRef(pathStyle.ref);
+    if (!normalizedRef) {
+      return { kind: "invalid_path" };
+    }
+
     return {
       kind: "proxy",
-      ref: pathStyle.ref,
+      ref: normalizedRef,
       targetPath: pathStyle.targetPath,
     };
   }
@@ -162,6 +185,7 @@ export {
   encodeRef,
   getProxyTarget,
   normalizePath,
+  normalizeRef,
   splitPathStyle,
 };
 

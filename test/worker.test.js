@@ -6,6 +6,7 @@ import {
   encodeRef,
   getProxyTarget,
   normalizePath,
+  normalizeRef,
   splitPathStyle,
 } from "../src/worker.js";
 
@@ -20,6 +21,13 @@ test("normalizePath rejects traversal segments including encoded variants", () =
   assert.equal(normalizePath("/%2e%2e/packages/index.json"), null);
   assert.equal(normalizePath("/%252e%252e/packages/index.json"), null);
   assert.equal(normalizePath("/packages/../index.json"), null);
+});
+
+test("normalizeRef trims boundary slashes and rejects traversal", () => {
+  assert.equal(normalizeRef("/main/"), "main");
+  assert.equal(normalizeRef("../main"), null);
+  assert.equal(normalizeRef("%2e%2e/main"), null);
+  assert.equal(normalizeRef("%252e%252e/main"), null);
 });
 
 test("splitPathStyle parses ref and target path", () => {
@@ -54,6 +62,11 @@ test("getProxyTarget applies query-ref precedence when both are present", () => 
     getProxyTarget(new URL("https://worker.example/main/packages/index.json?ref=other")),
     { kind: "proxy", ref: "other", targetPath: "main/packages/index.json" },
   );
+
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/main/packages/index.json?ref=/other/")),
+    { kind: "proxy", ref: "other", targetPath: "main/packages/index.json" },
+  );
 });
 
 test("getProxyTarget returns missing_ref when no ref can be inferred", () => {
@@ -71,6 +84,16 @@ test("getProxyTarget rejects unsafe traversal paths", () => {
 
   assert.deepEqual(
     getProxyTarget(new URL("https://worker.example/%252e%252e/packages/index.json?ref=main")),
+    { kind: "invalid_path" },
+  );
+
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/packages/index.json?ref=../other-repo/main")),
+    { kind: "invalid_path" },
+  );
+
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/packages/index.json?ref=%252e%252e/other-repo/main")),
     { kind: "invalid_path" },
   );
 });

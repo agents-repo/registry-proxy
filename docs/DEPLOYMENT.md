@@ -15,8 +15,6 @@ Store token in Cloudflare, never in repository files:
 wrangler secret put GITHUB_TOKEN
 ```
 
-Optional upstream override can be set in Worker environment as `UPSTREAM_BASE_URL` if required.
-
 ## Deploy
 
 ```bash
@@ -34,8 +32,8 @@ Capture the generated workers.dev URL.
 ## Validate
 
 ```bash
-curl -i "https://<worker>.workers.dev/packages/index.json"
-curl -i "https://<worker>.workers.dev/packages//manifest.json"
+curl -i "https://<worker>.workers.dev/main/packages/index.json"
+curl -i "https://<worker>.workers.dev/packages/index.json?ref=main"
 ```
 
 Repeat one request to confirm cache reuse behavior.

@@ -8,7 +8,7 @@ Proxy registry files from GitHub Raw through Cloudflare Workers with caching and
 
 1. Client requests a registry path on workers.dev.
 2. Worker normalizes the path and builds the upstream URL.
-3. Worker checks `caches.default` by request URL.
+3. Worker checks `caches.default` by resolved upstream URL.
 4. On miss, Worker fetches GitHub Raw with optional token auth.
 5. Worker returns upstream response and caches successful results.
 
@@ -20,8 +20,8 @@ Proxy registry files from GitHub Raw through Cloudflare Workers with caching and
 
 ## Path Mapping
 
-- Incoming path: `/packages/index.json`
-- Upstream base: `https://raw.githubusercontent.com/agents-repo/registry/main`
+- Incoming path: `/main/packages/index.json`
+- Upstream base: `https://raw.githubusercontent.com/agents-repo/registry`
 - Resolved upstream: `https://raw.githubusercontent.com/agents-repo/registry/main/packages/index.json`
 
 ## Method Policy
