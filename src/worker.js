@@ -4,14 +4,26 @@ const RAW_BASE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAM
 const CONTENTS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
+const CORS_ALLOW_ORIGIN = "*";
+
+function withCors(response) {
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", CORS_ALLOW_ORIGIN);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
 
 function jsonResponse(payload, status = 200) {
-  return new Response(JSON.stringify(payload, null, 2), {
+  return withCors(new Response(JSON.stringify(payload, null, 2), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
     },
-  });
+  }));
 }
 
 function usagePayload() {
@@ -241,10 +253,10 @@ export {
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== "GET") {
-      return new Response("Method Not Allowed", {
+      return withCors(new Response("Method Not Allowed", {
         status: 405,
         headers: { "Allow": "GET" },
-      });
+      }));
     }
 
     const requestUrl = new URL(request.url);
@@ -269,7 +281,7 @@ export default {
     const cacheKey = new Request(upstreamUrl, { method: "GET" });
     const cached = await cache.match(cacheKey);
     if (cached) {
-      return cached;
+      return withCors(cached);
     }
 
     let upstreamResponse;
@@ -282,7 +294,7 @@ export default {
         },
       });
     } catch {
-      return new Response("Bad Gateway", { status: 502 });
+      return withCors(new Response("Bad Gateway", { status: 502 }));
     }
 
     const responseHeaders = new Headers(upstreamResponse.headers);
@@ -291,11 +303,12 @@ export default {
       statusText: upstreamResponse.statusText,
       headers: responseHeaders,
     });
+    const responseWithCors = withCors(response);
 
     if (upstreamResponse.status === 200) {
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+      ctx.waitUntil(cache.put(cacheKey, responseWithCors.clone()));
     }
 
-    return response;
+    return responseWithCors;
   },
 };
