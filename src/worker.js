@@ -5,7 +5,7 @@ const CONTENTS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 const CORS_ALLOW_ORIGIN = "*";
-const UPSTREAM_USER_AGENT = "registry-proxy-worker/0.1 (+https://github.com/agents-repo/registry-proxy)";
+const UPSTREAM_USER_AGENT = "registry-proxy-worker/0.1.0 (+https://github.com/agents-repo/registry-proxy)";
 
 function withCors(response) {
   const headers = new Headers(response.headers);
@@ -250,6 +250,7 @@ export {
   normalizePath,
   normalizeRef,
   splitPathStyle,
+  UPSTREAM_USER_AGENT,
 };
 
 export default {

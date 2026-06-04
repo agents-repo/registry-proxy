@@ -9,6 +9,7 @@ import worker, {
   normalizePath,
   normalizeRef,
   splitPathStyle,
+  UPSTREAM_USER_AGENT,
 } from "../src/worker.js";
 
 test("normalizePath removes only leading slashes", () => {
@@ -136,7 +137,6 @@ test("buildContentsApiUrl targets GitHub Contents API with ref query", () => {
 
 test("buildUpstreamRequest uses raw host without token and Contents API with token", () => {
   const target = { ref: "main", targetPath: "packages/index.json" };
-  const expectedUserAgent = "registry-proxy-worker/0.1 (+https://github.com/agents-repo/registry-proxy)";
 
   const unauthenticated = buildUpstreamRequest(target, {}, new Headers({ Accept: "application/json" }));
   assert.equal(
@@ -144,7 +144,7 @@ test("buildUpstreamRequest uses raw host without token and Contents API with tok
     "https://raw.githubusercontent.com/agents-repo/registry/main/packages/index.json",
   );
   assert.equal(unauthenticated.headers.get("Accept"), "application/json");
-  assert.equal(unauthenticated.headers.get("User-Agent"), expectedUserAgent);
+  assert.equal(unauthenticated.headers.get("User-Agent"), UPSTREAM_USER_AGENT);
   assert.equal(unauthenticated.headers.has("Authorization"), false);
 
   const authenticated = buildUpstreamRequest(target, { GITHUB_TOKEN: "token-value" }, new Headers({ Accept: "application/json" }));
@@ -153,7 +153,7 @@ test("buildUpstreamRequest uses raw host without token and Contents API with tok
     "https://api.github.com/repos/agents-repo/registry/contents/packages/index.json?ref=main",
   );
   assert.equal(authenticated.headers.get("Accept"), "application/vnd.github.raw");
-  assert.equal(authenticated.headers.get("User-Agent"), expectedUserAgent);
+  assert.equal(authenticated.headers.get("User-Agent"), UPSTREAM_USER_AGENT);
   assert.equal(authenticated.headers.get("Authorization"), "Bearer token-value");
 });
 
