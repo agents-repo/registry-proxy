@@ -9,6 +9,7 @@ import worker, {
   normalizePath,
   normalizeRef,
   splitPathStyle,
+  UPSTREAM_USER_AGENT,
 } from "../src/worker.js";
 
 test("normalizePath removes only leading slashes", () => {
@@ -143,6 +144,7 @@ test("buildUpstreamRequest uses raw host without token and Contents API with tok
     "https://raw.githubusercontent.com/agents-repo/registry/main/packages/index.json",
   );
   assert.equal(unauthenticated.headers.get("Accept"), "application/json");
+  assert.equal(unauthenticated.headers.get("User-Agent"), UPSTREAM_USER_AGENT);
   assert.equal(unauthenticated.headers.has("Authorization"), false);
 
   const authenticated = buildUpstreamRequest(target, { GITHUB_TOKEN: "token-value" }, new Headers({ Accept: "application/json" }));
@@ -151,6 +153,7 @@ test("buildUpstreamRequest uses raw host without token and Contents API with tok
     "https://api.github.com/repos/agents-repo/registry/contents/packages/index.json?ref=main",
   );
   assert.equal(authenticated.headers.get("Accept"), "application/vnd.github.raw");
+  assert.equal(authenticated.headers.get("User-Agent"), UPSTREAM_USER_AGENT);
   assert.equal(authenticated.headers.get("Authorization"), "Bearer token-value");
 });
 
@@ -158,6 +161,7 @@ test("fetch rejects unsupported methods", async () => {
   const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json", { method: "POST" }), {}, { waitUntil() {} });
   assert.equal(response.status, 405);
   assert.equal(response.headers.get("Allow"), "GET");
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
 });
 
 test("fetch returns usage and missing_ref responses", async () => {
@@ -165,11 +169,13 @@ test("fetch returns usage and missing_ref responses", async () => {
 
   const usage = await worker.fetch(new Request("https://worker.example/main"), {}, ctx);
   assert.equal(usage.status, 200);
+  assert.equal(usage.headers.get("Access-Control-Allow-Origin"), "*");
   const usageBody = await usage.json();
   assert.equal(usageBody.repository, "agents-repo/registry");
 
   const missingRef = await worker.fetch(new Request("https://worker.example/packages/index.json"), {}, ctx);
   assert.equal(missingRef.status, 400);
+  assert.equal(missingRef.headers.get("Access-Control-Allow-Origin"), "*");
   const missingRefBody = await missingRef.json();
   assert.equal(missingRefBody.error, "missing_ref");
 });
@@ -181,6 +187,7 @@ test("fetch returns invalid_path for unsafe inputs", async () => {
     { waitUntil() {} },
   );
   assert.equal(response.status, 400);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
   const body = await response.json();
   assert.equal(body.error, "invalid_path");
 });
@@ -206,6 +213,7 @@ test("fetch returns cached response when cache key exists", async () => {
 
     const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json"), {}, { waitUntil() {} });
     assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(await response.text(), "cached");
   } finally {
     globalThis.caches = originalCaches;
@@ -233,6 +241,7 @@ test("fetch returns 502 when upstream fetch throws", async () => {
 
     const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json"), {}, { waitUntil() {} });
     assert.equal(response.status, 502);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
@@ -281,6 +290,7 @@ test("fetch caches upstream 200 on miss and serves subsequent hit", async () => 
 
     const firstResponse = await worker.fetch(request, {}, ctx);
     assert.equal(firstResponse.status, 200);
+    assert.equal(firstResponse.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(await firstResponse.text(), "upstream");
     assert.equal(fetchCount, 1);
     assert.equal(waitUntilPromises.length, 1);
@@ -289,8 +299,35 @@ test("fetch caches upstream 200 on miss and serves subsequent hit", async () => 
 
     const secondResponse = await worker.fetch(request, {}, ctx);
     assert.equal(secondResponse.status, 200);
+    assert.equal(secondResponse.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(await secondResponse.text(), "upstream");
     assert.equal(fetchCount, 1);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch preserves upstream 403 while adding CORS header", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response("forbidden", { status: 403 });
+
+    const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json"), {}, { waitUntil() {} });
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(await response.text(), "forbidden");
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
