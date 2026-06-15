@@ -143,3 +143,7 @@ dist/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Wrangler local state (account cache, miniflare state, etc.)
+.wrangler/
+.dev.vars

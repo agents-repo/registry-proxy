@@ -16,6 +16,7 @@ import worker, {
 
 test("getProxyTarget resolves tags listing route", () => {
   assert.deepEqual(getProxyTarget(new URL("https://worker.example/tags")), { kind: "tags" });
+  assert.deepEqual(getProxyTarget(new URL("https://worker.example/tags/")), { kind: "tags" });
 });
 
 test("getProxyTarget keeps path-style file proxy for ref/tags paths", () => {
@@ -54,7 +55,8 @@ test("fetch returns tags listing with CORS and pagination", async () => {
     globalThis.fetch = async (url) => {
       fetchCount += 1;
 
-      if (url.includes("page=1")) {
+      const page = new URL(String(url)).searchParams.get("page");
+      if (page === "1") {
         return new Response(JSON.stringify([{ name: "v1.2.0" }, { name: "v1.1.0" }]), {
           status: 200,
           headers: {

@@ -168,7 +168,7 @@ function getProxyTarget(requestUrl) {
     return { kind: "usage" };
   }
 
-  if (path === "tags") {
+  if (path === "tags" || path === "tags/") {
     return { kind: "tags" };
   }
 
