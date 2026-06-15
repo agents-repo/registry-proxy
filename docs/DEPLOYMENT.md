@@ -36,9 +36,12 @@ Capture the generated workers.dev URL.
 ```bash
 curl -i "https://<worker>.workers.dev/main/packages/index.json"
 curl -i "https://<worker>.workers.dev/packages/index.json?ref=main"
+curl -i "https://<worker>.workers.dev/tags"
 ```
 
 Repeat one request to confirm cache reuse behavior.
+
+The webapp uses `/tags` for version-line alias resolution (`v1.x`, `v1.2.x`). Deploy this endpoint before merging dependent webapp changes.
 
 ## Rollback or Redeploy
 

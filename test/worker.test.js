@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import worker, {
   buildContentsApiUrl,
+  buildTagsApiUrl,
   buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
@@ -9,8 +10,170 @@ import worker, {
   normalizePath,
   normalizeRef,
   splitPathStyle,
+  TAGS_API_BASE_URL,
   UPSTREAM_USER_AGENT,
 } from "../src/worker.js";
+
+test("getProxyTarget resolves tags listing route", () => {
+  assert.deepEqual(getProxyTarget(new URL("https://worker.example/tags")), { kind: "tags" });
+});
+
+test("getProxyTarget keeps path-style file proxy for ref/tags paths", () => {
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/main/tags")),
+    { kind: "proxy", ref: "main", targetPath: "tags" },
+  );
+});
+
+test("buildTagsApiUrl targets GitHub tags API with pagination", () => {
+  assert.equal(
+    buildTagsApiUrl(1),
+    `${TAGS_API_BASE_URL}?per_page=100&page=1`,
+  );
+  assert.equal(
+    buildTagsApiUrl(2),
+    `${TAGS_API_BASE_URL}?per_page=100&page=2`,
+  );
+});
+
+test("fetch returns tags listing with CORS and pagination", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    let fetchCount = 0;
+    globalThis.fetch = async (url) => {
+      fetchCount += 1;
+
+      if (url.includes("page=1")) {
+        return new Response(JSON.stringify([{ name: "v1.2.0" }, { name: "v1.1.0" }]), {
+          status: 200,
+          headers: {
+            "content-type": "application/json",
+            Link: `<${TAGS_API_BASE_URL}?per_page=100&page=2>; rel="next"`,
+          },
+        });
+      }
+
+      return new Response(JSON.stringify([{ name: "v1.0.0" }]), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+    };
+
+    const response = await worker.fetch(new Request("https://worker.example/tags"), {}, { waitUntil() {} });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(response.headers.get("content-type"), "application/json; charset=utf-8");
+    assert.deepEqual(await response.json(), [
+      { name: "v1.2.0" },
+      { name: "v1.1.0" },
+      { name: "v1.0.0" },
+    ]);
+    assert.equal(fetchCount, 2);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch caches tags listing on success", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const cacheWrites = [];
+    let fetchCount = 0;
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheWrites.push(request.url);
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response(JSON.stringify([{ name: "v1.2.0" }]), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+    };
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    };
+
+    const request = new Request("https://worker.example/tags");
+    const firstResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(firstResponse.status, 200);
+    assert.deepEqual(await firstResponse.json(), [{ name: "v1.2.0" }]);
+    assert.equal(fetchCount, 1);
+    await Promise.all(waitUntilPromises);
+    assert.equal(cacheWrites.length, 1);
+
+    const secondResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(secondResponse.status, 200);
+    assert.deepEqual(await secondResponse.json(), [{ name: "v1.2.0" }]);
+    assert.equal(fetchCount, 1);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch preserves upstream tags API errors", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response('{"message":"rate limit"}', {
+      status: 403,
+      headers: {
+        "content-type": "application/json",
+      },
+    });
+
+    const response = await worker.fetch(new Request("https://worker.example/tags"), {}, { waitUntil() {} });
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(await response.text(), '{"message":"rate limit"}');
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("normalizePath removes only leading slashes", () => {
   assert.equal(normalizePath("///main/packages/index.json"), "main/packages/index.json");
