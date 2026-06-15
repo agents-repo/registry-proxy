@@ -94,6 +94,21 @@ Examples:
 - Commit SHA:
   - `https://<worker>.workers.dev/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f`
 
+## Tags listing
+
+`GET /tags` returns all release tag names for `agents-repo/registry` as a JSON array in GitHub API shape: `[{ "name": "v1.2.0" }, ...]`.
+
+- No ref parameter required.
+- Responses include CORS `Access-Control-Allow-Origin: *`.
+- Successful responses are edge-cached like file proxy responses.
+- When `GITHUB_TOKEN` is configured, upstream uses authenticated GitHub API requests.
+
+Example:
+
+```bash
+curl -s "https://<worker>.workers.dev/tags"
+```
+
 Notes:
 
 - If both path ref and query ref are present, query ref is used.

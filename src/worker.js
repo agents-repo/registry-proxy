@@ -2,6 +2,8 @@ const REPO_OWNER = "agents-repo";
 const REPO_NAME = "registry";
 const RAW_BASE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}`;
 const CONTENTS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
+const TAGS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/tags`;
+const TAGS_API_PAGE_SIZE = 100;
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 const CORS_ALLOW_ORIGIN = "*";
@@ -34,6 +36,7 @@ function usagePayload() {
     supported_formats: [
       "/<ref>/<path>",
       "/<path>?ref=<ref>",
+      "/tags",
     ],
     examples: [
       "/main/packages/index.json",
@@ -41,6 +44,7 @@ function usagePayload() {
       "/packages/index.json?ref=release-2026-06",
       "/packages/index.json?ref=v1.0.0",
       "/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f",
+      "/tags",
     ],
   };
 }
@@ -164,6 +168,10 @@ function getProxyTarget(requestUrl) {
     return { kind: "usage" };
   }
 
+  if (path === "tags" || path === "tags/") {
+    return { kind: "tags" };
+  }
+
   const queryRef = requestUrl.searchParams.get("ref");
   if (queryRef !== null) {
     const normalizedRef = normalizeRef(queryRef);
@@ -219,6 +227,88 @@ function buildContentsApiUrl(ref, targetPath) {
   return `${CONTENTS_API_BASE_URL}/${normalizedPath}?ref=${encodeURIComponent(ref)}`;
 }
 
+function buildTagsApiUrl(page = 1) {
+  return `${TAGS_API_BASE_URL}?per_page=${TAGS_API_PAGE_SIZE}&page=${page}`;
+}
+
+function buildTagsUpstreamHeaders(env) {
+  const headers = new Headers();
+  headers.set("User-Agent", UPSTREAM_USER_AGENT);
+  headers.set("Accept", "application/vnd.github+json");
+  headers.set("X-GitHub-Api-Version", "2022-11-28");
+
+  if (env.GITHUB_TOKEN) {
+    headers.set("Authorization", `Bearer ${env.GITHUB_TOKEN}`);
+  }
+
+  return headers;
+}
+
+function parseLinkHeaderNextUrl(linkHeader) {
+  if (!linkHeader) {
+    return null;
+  }
+
+  const nextLink = linkHeader
+    .split(",")
+    .map((entry) => entry.trim())
+    .find((entry) => entry.endsWith('rel="next"'));
+
+  if (!nextLink) {
+    return null;
+  }
+
+  const match = /^<([^>]+)>/.exec(nextLink);
+  return match?.[1] ?? null;
+}
+
+async function fetchAllRepositoryTags(env) {
+  const tags = [];
+  let nextUrl = buildTagsApiUrl(1);
+  const headers = buildTagsUpstreamHeaders(env);
+
+  while (nextUrl) {
+    let upstreamResponse;
+
+    try {
+      upstreamResponse = await fetch(nextUrl, {
+        method: "GET",
+        headers,
+        cf: {
+          cacheEverything: true,
+        },
+      });
+    } catch {
+      throw new Error("tags_upstream_fetch_failed");
+    }
+
+    if (!upstreamResponse.ok) {
+      return {
+        ok: false,
+        status: upstreamResponse.status,
+        statusText: upstreamResponse.statusText,
+        body: upstreamResponse.body,
+      };
+    }
+
+    const pagePayload = await upstreamResponse.json();
+    if (Array.isArray(pagePayload)) {
+      tags.push(...pagePayload);
+    }
+
+    nextUrl = parseLinkHeaderNextUrl(upstreamResponse.headers.get("Link"));
+  }
+
+  return {
+    ok: true,
+    tags,
+  };
+}
+
+function buildTagsCacheKey() {
+  return new Request(`${TAGS_API_BASE_URL}?per_page=${TAGS_API_PAGE_SIZE}`, { method: "GET" });
+}
+
 function buildUpstreamRequest(target, env, requestHeaders) {
   const headers = new Headers();
   const requestAccept = requestHeaders.get("Accept") || "*/*";
@@ -243,6 +333,7 @@ function buildUpstreamRequest(target, env, requestHeaders) {
 
 export {
   buildContentsApiUrl,
+  buildTagsApiUrl,
   buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
@@ -250,6 +341,7 @@ export {
   normalizePath,
   normalizeRef,
   splitPathStyle,
+  TAGS_API_BASE_URL,
   UPSTREAM_USER_AGENT,
 };
 
@@ -275,6 +367,37 @@ export default {
 
     if (target.kind === "invalid_path") {
       return invalidPathResponse();
+    }
+
+    if (target.kind === "tags") {
+      const cache = caches.default;
+      const cacheKey = buildTagsCacheKey();
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        return withCors(cached);
+      }
+
+      let tagsResult;
+      try {
+        tagsResult = await fetchAllRepositoryTags(env);
+      } catch {
+        return withCors(new Response("Bad Gateway", { status: 502 }));
+      }
+
+      if (!tagsResult.ok) {
+        const response = new Response(tagsResult.body, {
+          status: tagsResult.status,
+          statusText: tagsResult.statusText,
+          headers: new Headers({
+            "content-type": "application/json; charset=utf-8",
+          }),
+        });
+        return withCors(response);
+      }
+
+      const response = jsonResponse(tagsResult.tags, 200);
+      ctx.waitUntil(cache.put(cacheKey, response.clone()));
+      return response;
     }
 
     const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
