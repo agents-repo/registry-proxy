@@ -300,6 +300,20 @@ test("buildContentsApiUrl targets GitHub Contents API with ref query", () => {
   );
 });
 
+test("buildUpstreamRequest forwards conditional request headers", () => {
+  const target = { ref: "main", targetPath: "packages/index.json" };
+  const requestHeaders = new Headers({
+    Accept: "application/json",
+    "If-None-Match": '"etag-value"',
+    "If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT",
+  });
+
+  const upstream = buildUpstreamRequest(target, {}, requestHeaders);
+
+  assert.equal(upstream.headers.get("If-None-Match"), '"etag-value"');
+  assert.equal(upstream.headers.get("If-Modified-Since"), "Wed, 21 Oct 2015 07:28:00 GMT");
+});
+
 test("buildUpstreamRequest uses raw host without token and Contents API with token", () => {
   const target = { ref: "main", targetPath: "packages/index.json" };
 
@@ -322,10 +336,27 @@ test("buildUpstreamRequest uses raw host without token and Contents API with tok
   assert.equal(authenticated.headers.get("Authorization"), "Bearer token-value");
 });
 
+test("fetch handles CORS preflight with OPTIONS", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/packages/index.json?ref=v1.2.0", { method: "OPTIONS" }),
+    {},
+    { waitUntil() {} },
+  );
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.equal(response.headers.get("Access-Control-Allow-Methods"), "GET, OPTIONS");
+  assert.equal(
+    response.headers.get("Access-Control-Allow-Headers"),
+    "Accept, If-None-Match, If-Modified-Since",
+  );
+  assert.equal(response.headers.get("Access-Control-Max-Age"), "86400");
+});
+
 test("fetch rejects unsupported methods", async () => {
   const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json", { method: "POST" }), {}, { waitUntil() {} });
   assert.equal(response.status, 405);
-  assert.equal(response.headers.get("Allow"), "GET");
+  assert.equal(response.headers.get("Allow"), "GET, OPTIONS");
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
 });
 
@@ -493,6 +524,51 @@ test("fetch preserves upstream 403 while adding CORS header", async () => {
     assert.equal(response.status, 403);
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(await response.text(), "forbidden");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch bypasses edge cache and forwards conditional headers to upstream", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    let fetchCount = 0;
+    let upstreamIfNoneMatch = null;
+
+    globalThis.caches = {
+      default: {
+        async match() {
+          return new Response("cached", { status: 200 });
+        },
+        async put() {
+          throw new Error("cache put should not run for conditional requests");
+        },
+      },
+    };
+
+    globalThis.fetch = async (_url, init) => {
+      fetchCount += 1;
+      upstreamIfNoneMatch = init?.headers?.get("If-None-Match") ?? null;
+      return new Response(null, { status: 304 });
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json?ref=v1.2.0", {
+        headers: {
+          "If-None-Match": '"etag-value"',
+        },
+      }),
+      {},
+      { waitUntil() {} },
+    );
+
+    assert.equal(response.status, 304);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(fetchCount, 1);
+    assert.equal(upstreamIfNoneMatch, '"etag-value"');
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
