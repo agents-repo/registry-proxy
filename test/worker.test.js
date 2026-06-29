@@ -537,6 +537,7 @@ test("fetch bypasses edge cache read and forwards conditional headers to upstrea
   try {
     let fetchCount = 0;
     let upstreamIfNoneMatch = null;
+    let upstreamFetchCacheEverything = null;
     let cachePutCount = 0;
 
     globalThis.caches = {
@@ -553,6 +554,7 @@ test("fetch bypasses edge cache read and forwards conditional headers to upstrea
     globalThis.fetch = async (_url, init) => {
       fetchCount += 1;
       upstreamIfNoneMatch = init?.headers?.get("If-None-Match") ?? null;
+      upstreamFetchCacheEverything = init?.cf?.cacheEverything ?? null;
       return new Response(null, { status: 304 });
     };
 
@@ -570,6 +572,7 @@ test("fetch bypasses edge cache read and forwards conditional headers to upstrea
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(fetchCount, 1);
     assert.equal(upstreamIfNoneMatch, '"etag-value"');
+    assert.equal(upstreamFetchCacheEverything, null);
     assert.equal(cachePutCount, 0);
   } finally {
     globalThis.caches = originalCaches;
@@ -585,6 +588,7 @@ test("fetch updates edge cache when conditional request receives fresh upstream 
     const cacheStore = new Map();
     const cacheWrites = [];
     let fetchCount = 0;
+    const fetchCacheEverythingValues = [];
 
     globalThis.caches = {
       default: {
@@ -600,6 +604,7 @@ test("fetch updates edge cache when conditional request receives fresh upstream 
 
     globalThis.fetch = async (_url, init) => {
       fetchCount += 1;
+      fetchCacheEverythingValues.push(init?.cf?.cacheEverything ?? null);
       const ifNoneMatch = init?.headers?.get("If-None-Match") ?? null;
       if (ifNoneMatch === '"stale-etag"') {
         return new Response("fresh", {
@@ -631,6 +636,7 @@ test("fetch updates edge cache when conditional request receives fresh upstream 
     const staleResponse = await worker.fetch(unconditionalRequest, {}, ctx);
     assert.equal(await staleResponse.text(), "stale");
     assert.equal(fetchCount, 1);
+    assert.deepEqual(fetchCacheEverythingValues, [true]);
     await Promise.all(waitUntilPromises);
     assert.equal(cacheWrites.length, 1);
 
@@ -646,6 +652,7 @@ test("fetch updates edge cache when conditional request receives fresh upstream 
     assert.equal(conditionalResponse.status, 200);
     assert.equal(await conditionalResponse.text(), "fresh");
     assert.equal(fetchCount, 2);
+    assert.deepEqual(fetchCacheEverythingValues, [true, null]);
     await Promise.all(waitUntilPromises);
     assert.equal(cacheWrites.length, 2);
 

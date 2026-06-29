@@ -446,15 +446,17 @@ export default {
       }
     }
 
+    const upstreamFetchOptions = {
+      method: "GET",
+      headers: upstreamRequest.headers,
+    };
+    if (!hasConditionalHeaders) {
+      upstreamFetchOptions.cf = { cacheEverything: true };
+    }
+
     let upstreamResponse;
     try {
-      upstreamResponse = await fetch(upstreamUrl, {
-        method: "GET",
-        headers: upstreamRequest.headers,
-        cf: {
-          cacheEverything: true,
-        },
-      });
+      upstreamResponse = await fetch(upstreamUrl, upstreamFetchOptions);
     } catch {
       return withCors(new Response("Bad Gateway", { status: 502 }));
     }
