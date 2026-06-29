@@ -300,6 +300,20 @@ test("buildContentsApiUrl targets GitHub Contents API with ref query", () => {
   );
 });
 
+test("buildUpstreamRequest forwards conditional request headers", () => {
+  const target = { ref: "main", targetPath: "packages/index.json" };
+  const requestHeaders = new Headers({
+    Accept: "application/json",
+    "If-None-Match": '"etag-value"',
+    "If-Modified-Since": "Wed, 21 Oct 2015 07:28:00 GMT",
+  });
+
+  const upstream = buildUpstreamRequest(target, {}, requestHeaders);
+
+  assert.equal(upstream.headers.get("If-None-Match"), '"etag-value"');
+  assert.equal(upstream.headers.get("If-Modified-Since"), "Wed, 21 Oct 2015 07:28:00 GMT");
+});
+
 test("buildUpstreamRequest uses raw host without token and Contents API with token", () => {
   const target = { ref: "main", targetPath: "packages/index.json" };
 
@@ -322,10 +336,27 @@ test("buildUpstreamRequest uses raw host without token and Contents API with tok
   assert.equal(authenticated.headers.get("Authorization"), "Bearer token-value");
 });
 
+test("fetch handles CORS preflight with OPTIONS", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/packages/index.json?ref=v1.2.0", { method: "OPTIONS" }),
+    {},
+    { waitUntil() {} },
+  );
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+  assert.equal(response.headers.get("Access-Control-Allow-Methods"), "GET, OPTIONS");
+  assert.equal(
+    response.headers.get("Access-Control-Allow-Headers"),
+    "Accept, If-None-Match, If-Modified-Since",
+  );
+  assert.equal(response.headers.get("Access-Control-Max-Age"), "86400");
+});
+
 test("fetch rejects unsupported methods", async () => {
   const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json", { method: "POST" }), {}, { waitUntil() {} });
   assert.equal(response.status, 405);
-  assert.equal(response.headers.get("Allow"), "GET");
+  assert.equal(response.headers.get("Allow"), "GET, OPTIONS");
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
 });
 
@@ -493,6 +524,141 @@ test("fetch preserves upstream 403 while adding CORS header", async () => {
     assert.equal(response.status, 403);
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(await response.text(), "forbidden");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch bypasses edge cache read and forwards conditional headers to upstream", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    let fetchCount = 0;
+    let upstreamIfNoneMatch = null;
+    let upstreamFetchCacheEverything = null;
+    let cachePutCount = 0;
+
+    globalThis.caches = {
+      default: {
+        async match() {
+          return new Response("cached", { status: 200 });
+        },
+        async put() {
+          cachePutCount += 1;
+        },
+      },
+    };
+
+    globalThis.fetch = async (_url, init) => {
+      fetchCount += 1;
+      upstreamIfNoneMatch = init?.headers?.get("If-None-Match") ?? null;
+      upstreamFetchCacheEverything = init?.cf?.cacheEverything ?? null;
+      return new Response(null, { status: 304 });
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json?ref=v1.2.0", {
+        headers: {
+          "If-None-Match": '"etag-value"',
+        },
+      }),
+      {},
+      { waitUntil() {} },
+    );
+
+    assert.equal(response.status, 304);
+    assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(fetchCount, 1);
+    assert.equal(upstreamIfNoneMatch, '"etag-value"');
+    assert.equal(upstreamFetchCacheEverything, null);
+    assert.equal(cachePutCount, 0);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch updates edge cache when conditional request receives fresh upstream 200", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const cacheWrites = [];
+    let fetchCount = 0;
+    const fetchCacheEverythingValues = [];
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheWrites.push(request.url);
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async (_url, init) => {
+      fetchCount += 1;
+      fetchCacheEverythingValues.push(init?.cf?.cacheEverything ?? null);
+      const ifNoneMatch = init?.headers?.get("If-None-Match") ?? null;
+      if (ifNoneMatch === '"stale-etag"') {
+        return new Response("fresh", {
+          status: 200,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+            etag: '"fresh-etag"',
+          },
+        });
+      }
+      return new Response("stale", {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
+    };
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    };
+
+    const url = "https://worker.example/main/packages/index.json";
+    const unconditionalRequest = new Request(url);
+
+    const staleResponse = await worker.fetch(unconditionalRequest, {}, ctx);
+    assert.equal(await staleResponse.text(), "stale");
+    assert.equal(fetchCount, 1);
+    assert.deepEqual(fetchCacheEverythingValues, [true]);
+    await Promise.all(waitUntilPromises);
+    assert.equal(cacheWrites.length, 1);
+
+    const conditionalResponse = await worker.fetch(
+      new Request(url, {
+        headers: {
+          "If-None-Match": '"stale-etag"',
+        },
+      }),
+      {},
+      ctx,
+    );
+    assert.equal(conditionalResponse.status, 200);
+    assert.equal(await conditionalResponse.text(), "fresh");
+    assert.equal(fetchCount, 2);
+    assert.deepEqual(fetchCacheEverythingValues, [true, null]);
+    await Promise.all(waitUntilPromises);
+    assert.equal(cacheWrites.length, 2);
+
+    const cachedResponse = await worker.fetch(unconditionalRequest, {}, ctx);
+    assert.equal(await cachedResponse.text(), "fresh");
+    assert.equal(fetchCount, 2);
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;

@@ -7,7 +7,26 @@ const TAGS_API_PAGE_SIZE = 100;
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 const CORS_ALLOW_ORIGIN = "*";
+const CORS_ALLOW_METHODS = "GET, OPTIONS";
+const CORS_ALLOW_HEADERS = "Accept, If-None-Match, If-Modified-Since";
+const CORS_MAX_AGE = "86400";
 const UPSTREAM_USER_AGENT = "registry-proxy-worker/0.1.0 (+https://github.com/agents-repo/registry-proxy)";
+
+function corsPreflightResponse() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": CORS_ALLOW_ORIGIN,
+      "Access-Control-Allow-Methods": CORS_ALLOW_METHODS,
+      "Access-Control-Allow-Headers": CORS_ALLOW_HEADERS,
+      "Access-Control-Max-Age": CORS_MAX_AGE,
+    },
+  });
+}
+
+function requestHasConditionalHeaders(requestHeaders) {
+  return requestHeaders.has("If-None-Match") || requestHeaders.has("If-Modified-Since");
+}
 
 function withCors(response) {
   const headers = new Headers(response.headers);
@@ -314,6 +333,16 @@ function buildUpstreamRequest(target, env, requestHeaders) {
   const requestAccept = requestHeaders.get("Accept") || "*/*";
   headers.set("User-Agent", UPSTREAM_USER_AGENT);
 
+  const ifNoneMatch = requestHeaders.get("If-None-Match");
+  if (ifNoneMatch) {
+    headers.set("If-None-Match", ifNoneMatch);
+  }
+
+  const ifModifiedSince = requestHeaders.get("If-Modified-Since");
+  if (ifModifiedSince) {
+    headers.set("If-Modified-Since", ifModifiedSince);
+  }
+
   if (env.GITHUB_TOKEN) {
     headers.set("Accept", "application/vnd.github.raw");
     headers.set("Authorization", `Bearer ${env.GITHUB_TOKEN}`);
@@ -347,10 +376,14 @@ export {
 
 export default {
   async fetch(request, env, ctx) {
+    if (request.method === "OPTIONS") {
+      return corsPreflightResponse();
+    }
+
     if (request.method !== "GET") {
       return withCors(new Response("Method Not Allowed", {
         status: 405,
-        headers: { "Allow": "GET" },
+        headers: { "Allow": CORS_ALLOW_METHODS },
       }));
     }
 
@@ -402,23 +435,28 @@ export default {
 
     const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
     const upstreamUrl = upstreamRequest.url;
+    const hasConditionalHeaders = requestHasConditionalHeaders(request.headers);
 
     const cache = caches.default;
     const cacheKey = new Request(upstreamUrl, { method: "GET" });
-    const cached = await cache.match(cacheKey);
-    if (cached) {
-      return withCors(cached);
+    if (!hasConditionalHeaders) {
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        return withCors(cached);
+      }
+    }
+
+    const upstreamFetchOptions = {
+      method: "GET",
+      headers: upstreamRequest.headers,
+    };
+    if (!hasConditionalHeaders) {
+      upstreamFetchOptions.cf = { cacheEverything: true };
     }
 
     let upstreamResponse;
     try {
-      upstreamResponse = await fetch(upstreamUrl, {
-        method: "GET",
-        headers: upstreamRequest.headers,
-        cf: {
-          cacheEverything: true,
-        },
-      });
+      upstreamResponse = await fetch(upstreamUrl, upstreamFetchOptions);
     } catch {
       return withCors(new Response("Bad Gateway", { status: 502 }));
     }
