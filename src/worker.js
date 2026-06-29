@@ -467,7 +467,7 @@ export default {
     });
     const responseWithCors = withCors(response);
 
-    if (upstreamResponse.status === 200 && !hasConditionalHeaders) {
+    if (upstreamResponse.status === 200) {
       ctx.waitUntil(cache.put(cacheKey, responseWithCors.clone()));
     }
 

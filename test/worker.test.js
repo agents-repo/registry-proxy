@@ -530,13 +530,14 @@ test("fetch preserves upstream 403 while adding CORS header", async () => {
   }
 });
 
-test("fetch bypasses edge cache and forwards conditional headers to upstream", async () => {
+test("fetch bypasses edge cache read and forwards conditional headers to upstream", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
 
   try {
     let fetchCount = 0;
     let upstreamIfNoneMatch = null;
+    let cachePutCount = 0;
 
     globalThis.caches = {
       default: {
@@ -544,7 +545,7 @@ test("fetch bypasses edge cache and forwards conditional headers to upstream", a
           return new Response("cached", { status: 200 });
         },
         async put() {
-          throw new Error("cache put should not run for conditional requests");
+          cachePutCount += 1;
         },
       },
     };
@@ -569,6 +570,88 @@ test("fetch bypasses edge cache and forwards conditional headers to upstream", a
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(fetchCount, 1);
     assert.equal(upstreamIfNoneMatch, '"etag-value"');
+    assert.equal(cachePutCount, 0);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch updates edge cache when conditional request receives fresh upstream 200", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const cacheWrites = [];
+    let fetchCount = 0;
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheWrites.push(request.url);
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async (_url, init) => {
+      fetchCount += 1;
+      const ifNoneMatch = init?.headers?.get("If-None-Match") ?? null;
+      if (ifNoneMatch === '"stale-etag"') {
+        return new Response("fresh", {
+          status: 200,
+          headers: {
+            "content-type": "text/plain; charset=utf-8",
+            etag: '"fresh-etag"',
+          },
+        });
+      }
+      return new Response("stale", {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
+    };
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    };
+
+    const url = "https://worker.example/main/packages/index.json";
+    const unconditionalRequest = new Request(url);
+
+    const staleResponse = await worker.fetch(unconditionalRequest, {}, ctx);
+    assert.equal(await staleResponse.text(), "stale");
+    assert.equal(fetchCount, 1);
+    await Promise.all(waitUntilPromises);
+    assert.equal(cacheWrites.length, 1);
+
+    const conditionalResponse = await worker.fetch(
+      new Request(url, {
+        headers: {
+          "If-None-Match": '"stale-etag"',
+        },
+      }),
+      {},
+      ctx,
+    );
+    assert.equal(conditionalResponse.status, 200);
+    assert.equal(await conditionalResponse.text(), "fresh");
+    assert.equal(fetchCount, 2);
+    await Promise.all(waitUntilPromises);
+    assert.equal(cacheWrites.length, 2);
+
+    const cachedResponse = await worker.fetch(unconditionalRequest, {}, ctx);
+    assert.equal(await cachedResponse.text(), "fresh");
+    assert.equal(fetchCount, 2);
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
