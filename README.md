@@ -90,7 +90,9 @@ Examples:
 - Named branch:
   - `https://<worker>.workers.dev/packages/index.json?ref=release-2026-06`
 - Tag:
-  - `https://<worker>.workers.dev/packages/index.json?ref=v1.0.0`
+  - `https://<worker>.workers.dev/packages/index.json?ref=v2.0.0`
+- Namespaced package artifact (v2+ layout):
+  - `https://<worker>.workers.dev/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip`
 - Commit SHA:
   - `https://<worker>.workers.dev/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f`
 
@@ -111,6 +113,7 @@ curl -s "https://<worker>.workers.dev/tags"
 
 Notes:
 
+- Flat package paths such as `packages/hello-agent/...` are rejected with HTTP 400 (`legacy_flat_path_not_supported`). Use `packages/<namespace>/<package-id>/...`.
 - If both path ref and query ref are present, query ref is used.
 - Non-GET methods are rejected with `405 Method Not Allowed`.
 
