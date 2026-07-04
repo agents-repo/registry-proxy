@@ -48,6 +48,37 @@ function jsonResponse(payload, status = 200) {
   }));
 }
 
+const PACKAGE_ROOT_FILES = new Set(["index.json", "tree.json"]);
+
+function legacyFlatPathResponse() {
+  return jsonResponse({
+    error: "legacy_flat_path_not_supported",
+    message: "Flat package paths (packages/<package-id>/...) are no longer supported. Use packages/<namespace>/<package-id>/...",
+  }, 400);
+}
+
+function isLegacyFlatPackagePath(targetPath) {
+  if (!targetPath.startsWith("packages/")) {
+    return false;
+  }
+
+  const segments = targetPath.slice("packages/".length).split("/").filter(Boolean);
+  if (segments.length === 0) {
+    return false;
+  }
+
+  const firstSegment = segments[0];
+  if (PACKAGE_ROOT_FILES.has(firstSegment)) {
+    return false;
+  }
+
+  if (segments.length === 1) {
+    return true;
+  }
+
+  return segments[1] === "versions";
+}
+
 function usagePayload() {
   return {
     message: "Use this Worker to proxy files from agents-repo/registry by ref.",
@@ -59,6 +90,8 @@ function usagePayload() {
     ],
     examples: [
       "/main/packages/index.json",
+      "/main/packages/tree.json",
+      "/main/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip",
       "/packages/index.json?ref=main",
       "/packages/index.json?ref=release-2026-06",
       "/packages/index.json?ref=v1.0.0",
@@ -367,6 +400,7 @@ export {
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
+  isLegacyFlatPackagePath,
   normalizePath,
   normalizeRef,
   splitPathStyle,
@@ -400,6 +434,10 @@ export default {
 
     if (target.kind === "invalid_path") {
       return invalidPathResponse();
+    }
+
+    if (target.kind === "proxy" && isLegacyFlatPackagePath(target.targetPath)) {
+      return legacyFlatPathResponse();
     }
 
     if (target.kind === "tags") {

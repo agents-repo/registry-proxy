@@ -7,6 +7,7 @@ import worker, {
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
+  isLegacyFlatPackagePath,
   normalizePath,
   normalizeRef,
   splitPathStyle,
@@ -175,6 +176,46 @@ test("fetch preserves upstream tags API errors", async () => {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
   }
+});
+
+test("isLegacyFlatPackagePath rejects flat package paths", () => {
+  assert.equal(isLegacyFlatPackagePath("packages/hello-agent/versions/1.0.0/1.0.0-cursor.zip"), true);
+  assert.equal(isLegacyFlatPackagePath("packages/hello-agent"), true);
+  assert.equal(isLegacyFlatPackagePath("packages/index.json"), false);
+  assert.equal(isLegacyFlatPackagePath("packages/tree.json"), false);
+  assert.equal(
+    isLegacyFlatPackagePath("packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip"),
+    false,
+  );
+});
+
+test("getProxyTarget allows namespaced package paths", () => {
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/main/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip")),
+    {
+      kind: "proxy",
+      ref: "main",
+      targetPath: "packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip",
+    },
+  );
+});
+
+test("buildUpstreamUrl preserves namespaced package paths", () => {
+  assert.equal(
+    buildUpstreamUrl("v2.x", "packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip"),
+    "https://raw.githubusercontent.com/agents-repo/registry/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip",
+  );
+});
+
+test("fetch rejects legacy flat package paths with 400", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/main/packages/hello-agent/versions/1.0.0/1.0.0-cursor.zip"),
+    {},
+    { waitUntil() {} },
+  );
+  assert.equal(response.status, 400);
+  const body = await response.json();
+  assert.equal(body.error, "legacy_flat_path_not_supported");
 });
 
 test("normalizePath removes only leading slashes", () => {
