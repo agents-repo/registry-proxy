@@ -86,6 +86,33 @@ describe('sync-cursor-rules', () => {
     assert.doesNotMatch(output, /\]\(CONTRIBUTING\.md\)/);
   });
 
+  it('removes stale generated sibling rules on sync', async () => {
+    const repo = makeTempRepo();
+    tempRepos.push(repo);
+    fs.writeFileSync(
+      path.join(repo, '.github', 'copilot-instructions.md'),
+      '# Source\n',
+      'utf-8',
+    );
+
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+
+    const rulesDir = path.join(repo, '.cursor', 'rules');
+    fs.writeFileSync(
+      path.join(rulesDir, 'old-generated.mdc'),
+      '<!-- Generated from .github/copilot-instructions.md — do not edit; run npm run sync:cursor-rules -->\nstale\n',
+      'utf-8',
+    );
+
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+
+    assert.equal(fs.existsSync(path.join(rulesDir, 'old-generated.mdc')), false);
+    assert.equal(fs.existsSync(path.join(rulesDir, 'agents-registry-proxy.mdc')), true);
+  });
+
   it('exits non-zero on drift when --check', async () => {
     const repo = makeTempRepo();
     tempRepos.push(repo);

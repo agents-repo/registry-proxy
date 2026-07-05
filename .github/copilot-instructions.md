@@ -8,8 +8,8 @@ This repository implements a Cloudflare Worker proxy for registry assets.
 2. Read [../docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
 3. Read [../CONTRIBUTING.md](../CONTRIBUTING.md).
 4. Read [CONTRIBUTING.md](CONTRIBUTING.md).
-5. Use an issue form under `ISSUE_TEMPLATE/` before implementation changes.
-6. Use `pull_request_template.md` sections for PR body content.
+5. Use an issue form under `.github/ISSUE_TEMPLATE/` before implementation changes.
+6. Use `.github/pull_request_template.md` sections for PR body content.
 7. Confirm no secret values are introduced into tracked files.
 
 ## Guardrails
