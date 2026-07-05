@@ -1,6 +1,8 @@
 # GitHub CLI Workflow
 
-This project uses an issue-first workflow with GitHub CLI.
+This project uses a required issue → branch → push → draft PR workflow with
+GitHub CLI. See `.github/CONTRIBUTING.md` **Required Workflow** for normative
+rules.
 
 ## 0. Bootstrap Local Runtime
 
@@ -24,6 +26,8 @@ gh issue create \
   --body "Scope, acceptance criteria, and validation plan"
 ```
 
+Use the matching issue form under `.github/ISSUE_TEMPLATE/` when available.
+
 ## 2. Create Branch From Issue Context
 
 Option A:
@@ -35,13 +39,19 @@ gh issue develop <issue-number> --name "feat/<issue-number>-short-slug"
 Option B:
 
 ```bash
+git checkout main && git pull
 git checkout -b "feat/<issue-number>-short-slug"
 ```
 
-## 3. Open Pull Request
+## 3. Push Branch and Open Draft Pull Request
+
+Push the branch before opening the pull request. An empty branch push is
+acceptable when opening the draft PR before implementation commits.
 
 ```bash
-gh pr create \
+git push -u origin HEAD
+
+gh pr create --draft \
   --base main \
   --head "feat/<issue-number>-short-slug" \
   --title "feat: short description" \
@@ -53,20 +63,29 @@ Then edit PR body to include:
 - `Closes #<issue-number>` in `## Related Issues`
 - Validation evidence from npm commands
 
-## 4. Review and Merge
+Open the draft PR before implementation commits, then push additional commits to
+the same branch as work progresses.
 
-```bash
-gh pr view <pr-number>
-gh pr merge <pr-number> --squash
-```
-
-## 5. Required Local Validation Before Review
+## 4. Implement and Validate
 
 ```bash
 npm run env:check
 npm run lint:all
 npm run check:secrets
 npm run test
+```
+
+## 5. Review and Merge (Human Maintainers Only)
+
+```bash
+gh pr view <pr-number>
+```
+
+Human maintainers merge after review. Agents and automation MUST NOT run
+`gh pr merge` or push directly to `main`.
+
+```bash
+gh pr merge <pr-number> --squash
 ```
 
 ## Fallback Without gh

@@ -31,9 +31,16 @@ List affected paths:
 - [ ] Test command passes (`npm run test`).
 - [ ] Documentation remains deterministic and clear.
 - [ ] PR follows `.github/pull_request_template.md` sections.
+- [ ] A tracking issue was opened before implementation.
+- [ ] The branch name follows `<prefix>/<issue-number>-<slug>`.
+- [ ] This draft PR was opened before implementation commits (or documents
+  why not).
+- [ ] `## Related Issues` includes `Closes #<issue-number>`.
 - [ ] Issue form was used or equivalent required fields were included.
 - [ ] Merge to `main` is for human maintainers only; agents and automation
   must not merge this PR or push directly to `main`.
+- [ ] Agents have not marked this PR ready for review without maintainer
+  direction.
 
 ## Validation Evidence
 
@@ -48,4 +55,4 @@ List affected paths:
 
 ## Related Issues
 
-- Closes #ISSUE_NUMBER
+Include `Closes #<issue-number>` for the tracking issue this PR closes.

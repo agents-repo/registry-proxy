@@ -10,6 +10,11 @@ body:
       value: |
         Branch name: `chore/<issue-number>-<short-slug>`
 
+        Create this issue first to obtain the issue number, then open the branch.
+
+        You MUST open a draft pull request targeting `main` before implementation
+        commits. Include `Closes #<issue-number>` in `## Related Issues`.
+
   - type: textarea
     id: objective
     attributes:
@@ -43,5 +48,5 @@ body:
       options:
         - label: I searched for existing similar issues.
           required: true
-        - label: If I open a PR, I will include Closes #<issue-number> in Related Issues.
+        - label: I will open a draft PR before implementation and include Closes #<issue-number> in Related Issues.
           required: true

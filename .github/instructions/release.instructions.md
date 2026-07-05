@@ -5,6 +5,7 @@ description: "Use for deployment helper script updates."
 
 # Release Script Instructions
 
+- Follow `.github/CONTRIBUTING.md` **Required Workflow** before implementation.
 - Keep deploy helper simple and auditable.
 - Use Wrangler deploy command as primary action.
 - Avoid adding secrets, inline tokens, or environment dumps.
