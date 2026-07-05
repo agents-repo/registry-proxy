@@ -10,6 +10,8 @@
     "lint:js": "eslint \"**/*.js\"",
     "lint:yaml": "node scripts/lint-yaml.js",
     "lint:all": "npm run lint:md && npm run lint:js && npm run lint:yaml",
+    "sync:cursor-rules": "node scripts/sync-cursor-rules.mjs",
+    "test:sync": "node --test test/sync-cursor-rules.test.mjs",
     "check:secrets": "bash scripts/check-secrets.sh",
     "test": "node --test 'test/**/*.test.js'",
     "release:dry-run": "semantic-release --dry-run",

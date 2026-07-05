@@ -1,3 +1,10 @@
+---
+description: Registry proxy project guidelines (mirrors copilot-instructions.md)
+alwaysApply: true
+---
+
+<!-- Generated from .github/copilot-instructions.md — do not edit; run npm run sync:cursor-rules -->
+
 # Copilot Project Instructions
 
 This repository implements a Cloudflare Worker proxy for registry assets.

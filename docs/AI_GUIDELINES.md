@@ -7,9 +7,10 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 ## Before You Implement
 
 1. Read [.github/copilot-instructions.md](../.github/copilot-instructions.md).
-2. Read [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md).
-3. Read [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
-4. Confirm scope from the linked issue.
+2. Read [.cursor/rules/agents-registry-proxy.mdc](../.cursor/rules/agents-registry-proxy.mdc).
+3. Read [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md).
+4. Read [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
+5. Confirm scope from the linked issue.
 
 ## Working Rules
 
@@ -17,6 +18,14 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 - Keep changes scoped to issue requirements.
 - Prefer small, reviewable commits.
 - Update docs when behavior changes.
+- Do not merge to or push directly to `main`; open draft PRs and hand off for
+  human maintainer review.
+
+After editing `.github/copilot-instructions.md`, regenerate the Cursor rule:
+
+```bash
+npm run sync:cursor-rules
+```
 
 ## Verification Evidence
 

@@ -32,6 +32,8 @@ List affected paths:
 - [ ] Documentation remains deterministic and clear.
 - [ ] PR follows `.github/pull_request_template.md` sections.
 - [ ] Issue form was used or equivalent required fields were included.
+- [ ] Merge to `main` is for human maintainers only; agents and automation
+  must not merge this PR or push directly to `main`.
 
 ## Validation Evidence
 

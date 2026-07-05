@@ -18,7 +18,28 @@ Recommended flow:
 
 1. Inspect issue scope.
 2. Create a branch from issue number and slug.
-3. Open a pull request using `.github/pull_request_template.md`.
+3. Open a draft pull request using `.github/pull_request_template.md`.
+4. Hand off for human review. Agents MUST NOT merge pull requests into `main`,
+   push directly to `main`, or mark PRs ready to merge without maintainer
+   direction.
+
+Repo-wide instructions live in `.github/copilot-instructions.md`. Path-scoped
+Copilot instructions under `.github/instructions/*.instructions.md` remain in
+effect for matching files and supplement the repo-wide guide.
+
+## IDE deployment mirrors
+
+| Path | Source |
+| --- | --- |
+| `.cursor/rules/agents-registry-proxy.mdc` | `.github/copilot-instructions.md` |
+
+Regenerate after editing `copilot-instructions.md`:
+
+```bash
+npm run sync:cursor-rules
+```
+
+Do not edit `.cursor/rules/` directly.
 
 ## Branch Naming
 
