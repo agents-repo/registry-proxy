@@ -38,6 +38,13 @@ the organization
 [Required Workflow](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#required-workflow)
 for shared norms.
 
+## Workflow exceptions
+
+1. **Security vulnerabilities** — Follow the private advisory flow. In
+   `## Related Issues`, use `Closes #<issue-number>` when maintainers provide
+   a linked private or advisory tracking issue. Otherwise, reference the
+   private security advisory identifier in the PR body.
+
 ## GitHub Communication Method (Preferred)
 
 Use `gh` CLI for issue and pull request communication when possible.
