@@ -24,11 +24,28 @@ Sync ${CONFIG.SOURCE} -> ${CONFIG.TARGET}
 `);
 }
 
+const SOURCE_DIR = path.posix.dirname(CONFIG.SOURCE);
+const TARGET_DIR = path.posix.dirname(CONFIG.TARGET);
+
+function rewriteRelativeLinks(body) {
+  return body.replace(/\[([^\]]*)\]\(([^)]+)\)/g, (match, text, url) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|#)/i.test(url)) {
+      return match;
+    }
+
+    const resolvedFromRoot = path.posix.normalize(path.posix.join(SOURCE_DIR, url));
+    const rewritten = path.posix.relative(TARGET_DIR, resolvedFromRoot);
+    const rewrittenText = text === url ? rewritten : text;
+    return `[${rewrittenText}](${rewritten})`;
+  });
+}
+
 function transformSource(source) {
   let body = source;
   for (const [from, to] of CONFIG.TITLE_TRANSFORMS) {
     body = body.replaceAll(from, to);
   }
+  body = rewriteRelativeLinks(body);
 
   return [
     '---',
