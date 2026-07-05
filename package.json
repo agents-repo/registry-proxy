@@ -7,7 +7,7 @@
   "scripts": {
     "env:check": "node scripts/validate-env.js",
     "lint:md": "markdownlint-cli2 \"**/*.md\" \"**/.*/**/*.md\"",
-    "lint:js": "eslint \"**/*.js\"",
+    "lint:js": "eslint \"**/*.{js,mjs}\"",
     "lint:yaml": "node scripts/lint-yaml.js",
     "lint:all": "npm run lint:md && npm run lint:js && npm run lint:yaml",
     "sync:cursor-rules": "node scripts/sync-cursor-rules.mjs",

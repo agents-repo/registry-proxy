@@ -6,7 +6,12 @@ export default [
     ignores: ["node_modules/**", ".git/**", "coverage/**"],
   },
   {
-    files: ["scripts/**/*.js", ".github/**/*.js", "test/**/*.js", "*.js"],
+    files: [
+      "scripts/**/*.{js,mjs}",
+      ".github/**/*.{js,mjs}",
+      "test/**/*.{js,mjs}",
+      "*.{js,mjs}",
+    ],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
