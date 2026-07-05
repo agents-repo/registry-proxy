@@ -71,4 +71,48 @@ describe('sync-cursor-rules', () => {
       (error) => error.code === 1,
     );
   });
+
+  it('ignores unrelated .mdc files during --check', async () => {
+    const repo = makeTempRepo();
+    tempRepos.push(repo);
+    fs.writeFileSync(
+      path.join(repo, '.github', 'copilot-instructions.md'),
+      '# Source\n',
+      'utf-8',
+    );
+
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+
+    fs.writeFileSync(
+      path.join(repo, '.cursor', 'rules', 'custom-rule.mdc'),
+      '---\nalwaysApply: false\n---\n',
+      'utf-8',
+    );
+
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs', '--check'], { cwd: repo });
+  });
+
+  it('treats CRLF mirror content as in sync when logically identical', async () => {
+    const repo = makeTempRepo();
+    tempRepos.push(repo);
+    fs.writeFileSync(
+      path.join(repo, '.github', 'copilot-instructions.md'),
+      '# Source\n',
+      'utf-8',
+    );
+
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+
+    const mirrorPath = path.join(repo, '.cursor', 'rules', 'agents-registry-proxy.mdc');
+    const content = fs.readFileSync(mirrorPath, 'utf-8');
+    fs.writeFileSync(mirrorPath, content.replace(/\n/g, '\r\n'), 'utf-8');
+
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs', '--check'], { cwd: repo });
+  });
 });

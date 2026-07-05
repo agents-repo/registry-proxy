@@ -13,7 +13,7 @@
     "sync:cursor-rules": "node scripts/sync-cursor-rules.mjs",
     "test:sync": "node --test test/sync-cursor-rules.test.mjs",
     "check:secrets": "bash scripts/check-secrets.sh",
-    "test": "node --test 'test/**/*.test.js'",
+    "test": "npm run test:sync && node --test 'test/**/*.test.js'",
     "release:dry-run": "semantic-release --dry-run",
     "prepare": "husky"
   },

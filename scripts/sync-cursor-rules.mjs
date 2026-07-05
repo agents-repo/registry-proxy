@@ -43,6 +43,18 @@ function transformSource(source) {
   ].join('\n');
 }
 
+function normalizeEol(text) {
+  return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function isGeneratedMirrorFile(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf-8').includes(CONFIG.GENERATED_COMMENT);
+  } catch {
+    return false;
+  }
+}
+
 function listStaleMdcFiles(rulesDir, keepFileName) {
   if (!fs.existsSync(rulesDir)) {
     return [];
@@ -53,7 +65,13 @@ function listStaleMdcFiles(rulesDir, keepFileName) {
     if (!entry.endsWith('.mdc') || entry === keepFileName) {
       continue;
     }
-    stale.push(path.join(rulesDir, entry));
+
+    const filePath = path.join(rulesDir, entry);
+    if (!isGeneratedMirrorFile(filePath)) {
+      continue;
+    }
+
+    stale.push(filePath);
   }
   return stale;
 }
@@ -67,13 +85,13 @@ function checkMirror() {
     process.exit(1);
   }
 
-  const expected = transformSource(fs.readFileSync(sourcePath, 'utf-8'));
+  const expected = transformSource(normalizeEol(fs.readFileSync(sourcePath, 'utf-8')));
   const issues = [];
 
   if (!fs.existsSync(targetPath)) {
     issues.push({ kind: 'missing', path: CONFIG.TARGET });
   } else {
-    const actual = fs.readFileSync(targetPath, 'utf-8');
+    const actual = normalizeEol(fs.readFileSync(targetPath, 'utf-8'));
     if (actual !== expected) {
       issues.push({ kind: 'modified', path: CONFIG.TARGET });
     }
@@ -105,7 +123,7 @@ function writeMirror() {
     process.exit(1);
   }
 
-  const content = transformSource(fs.readFileSync(sourcePath, 'utf-8'));
+  const content = transformSource(normalizeEol(fs.readFileSync(sourcePath, 'utf-8')));
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   fs.writeFileSync(targetPath, content, 'utf-8');
 
