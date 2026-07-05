@@ -63,8 +63,8 @@ Then edit PR body to include:
 - `Closes #<issue-number>` in `## Related Issues`
 - Validation evidence from npm commands
 
-Open the draft PR before implementation commits, then push additional commits to
-the same branch as work progresses.
+Open the draft PR before implementation commits (`gh pr create --draft`), then
+push additional commits to the same branch as work progresses.
 
 ## 4. Implement and Validate
 
@@ -75,7 +75,11 @@ npm run check:secrets
 npm run test
 ```
 
-## 5. Review and Merge (Human Maintainers Only)
+## 5. Mark Ready and Merge (Human Maintainers Only)
+
+After validation passes, the developer manually marks the pull request ready
+for review in GitHub. Agents and automation MUST NOT mark pull requests ready
+for review.
 
 ```bash
 gh pr view <pr-number>

@@ -21,8 +21,10 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 - Keep changes scoped to issue requirements.
 - Prefer small, reviewable commits.
 - Update docs when behavior changes.
-- Do not merge to or push directly to `main`; open a draft PR before
-  implementation commits and hand off for human maintainer review.
+- Do not merge to or push directly to `main`; open a draft PR with
+  `gh pr create --draft` before implementation commits. After validation, the
+  developer manually marks the pull request ready for review; agents must not
+  mark pull requests ready for review.
 
 After editing `.github/copilot-instructions.md`, regenerate the Cursor rule:
 

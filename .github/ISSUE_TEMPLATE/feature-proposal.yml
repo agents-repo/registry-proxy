@@ -13,7 +13,8 @@ body:
         Create this issue first to obtain the issue number, then open the branch.
 
         You MUST open a draft pull request targeting `main` before implementation
-        commits. Include `Closes #<issue-number>` in `## Related Issues`.
+        commits (`gh pr create --draft`). The developer manually marks the PR
+        ready for review after validation. Include `Closes #<issue-number>` in `## Related Issues`.
 
         Use this form for new proxy, CI, or governance capabilities.
 

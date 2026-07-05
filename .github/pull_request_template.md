@@ -33,14 +33,16 @@ List affected paths:
 - [ ] PR follows `.github/pull_request_template.md` sections.
 - [ ] A tracking issue was opened before implementation.
 - [ ] The branch name follows `<prefix>/<issue-number>-<slug>`.
+- [ ] This pull request was created as a draft (`gh pr create --draft` or UI
+  draft option).
 - [ ] This draft PR was opened before implementation commits (or documents
   why not).
 - [ ] `## Related Issues` includes `Closes #<issue-number>`.
 - [ ] Issue form was used or equivalent required fields were included.
 - [ ] Merge to `main` is for human maintainers only; agents and automation
   must not merge this PR or push directly to `main`.
-- [ ] Agents have not marked this PR ready for review without maintainer
-  direction.
+- [ ] A human developer marked this PR ready for review after validation (not
+  agents or automation).
 
 ## Validation Evidence
 

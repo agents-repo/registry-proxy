@@ -19,10 +19,12 @@ Contributors and agents MUST follow this lifecycle before implementation:
 2. Create a branch from issue number and slug.
 3. Push the branch to the remote repository.
 4. Open a draft pull request using `.github/pull_request_template.md` before
-   implementation commits.
-5. Hand off for human review. Agents MUST NOT merge pull requests into `main`,
-   push directly to `main`, or mark PRs ready to merge without maintainer
-   direction.
+   implementation commits. Pull requests MUST be created as drafts
+   (`gh pr create --draft`).
+5. Implement, validate, then hand off. After validation passes, the developer
+   manually marks the pull request ready for review in GitHub. Agents MUST NOT
+   merge pull requests into `main`, push directly to `main`, or mark pull
+   requests ready for review.
 
 All contributors MUST integrate changes to `main` only through merged pull
 requests. Direct commits or pushes to `main` MUST NOT be used.
