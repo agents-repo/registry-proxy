@@ -113,6 +113,50 @@ describe('sync-cursor-rules', () => {
     assert.equal(fs.existsSync(path.join(rulesDir, 'agents-registry-proxy.mdc')), true);
   });
 
+  it('reports stale generated sibling rules during --check', async () => {
+    const repo = makeTempRepo();
+    tempRepos.push(repo);
+    fs.writeFileSync(
+      path.join(repo, '.github', 'copilot-instructions.md'),
+      '# Source\n',
+      'utf-8',
+    );
+
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+
+    fs.writeFileSync(
+      path.join(repo, '.cursor', 'rules', 'old-generated.mdc'),
+      '<!-- Generated from .github/copilot-instructions.md — do not edit; run npm run sync:cursor-rules -->\nstale\n',
+      'utf-8',
+    );
+
+    await assert.rejects(
+      () => execFileAsync('node', ['scripts/sync-cursor-rules.mjs', '--check'], { cwd: repo }),
+      (error) => error.code === 1,
+    );
+  });
+
+  it('rewrites titled markdown links while preserving the title suffix', async () => {
+    const repo = makeTempRepo();
+    tempRepos.push(repo);
+    const source = 'Read [../README.md](../README.md "Repo readme").\n';
+    fs.writeFileSync(path.join(repo, '.github', 'copilot-instructions.md'), source, 'utf-8');
+
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+
+    const output = fs.readFileSync(
+      path.join(repo, '.cursor', 'rules', 'agents-registry-proxy.mdc'),
+      'utf-8',
+    );
+    assert.match(output, /\[(\.\.\/){2}README\.md\]\((\.\.\/){2}README\.md "Repo readme"\)/);
+  });
+
   it('exits non-zero on drift when --check', async () => {
     const repo = makeTempRepo();
     tempRepos.push(repo);
