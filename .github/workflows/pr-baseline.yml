@@ -20,6 +20,9 @@ jobs:
       - name: Run lints
         run: npm run lint:all
 
+      - name: Check Cursor rule mirror
+        run: npm run sync:cursor-rules -- --check
+
       - name: Run tests
         run: npm run test
 

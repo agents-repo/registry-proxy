@@ -113,7 +113,12 @@ curl -s "https://<worker>.workers.dev/tags"
 
 Notes:
 
-- Flat package paths such as `packages/hello-agent/...` are rejected with HTTP 400 (`legacy_flat_path_not_supported`). Use `packages/<namespace>/<package-id>/...`.
+- Legacy flat package paths are rejected with HTTP 400
+  (`legacy_flat_path_not_supported`): a bare package id (for example
+  `packages/hello-agent`) or any path whose second segment is `versions` under
+  that id (for example `packages/hello-agent/versions/1.0.0/...`). Other paths
+  under a flat id (such as `packages/hello-agent/metadata.json`) are proxied
+  upstream. Use namespaced paths: `packages/<namespace>/<package-id>/...`.
 - If both path ref and query ref are present, query ref is used.
 - Non-GET methods are rejected with `405 Method Not Allowed`.
 
@@ -149,6 +154,8 @@ Example:
 - Issue forms: `.github/ISSUE_TEMPLATE/`
 - Pull request template: `.github/pull_request_template.md`
 - Copilot project instructions: `.github/copilot-instructions.md`
+- Cursor project rules: `.cursor/rules/agents-registry-proxy.mdc`
+- Cursor sync: `npm run sync:cursor-rules` (after editing copilot instructions)
 - CI workflows: `.github/workflows/`
 - Code ownership: `.github/CODEOWNERS`
 
