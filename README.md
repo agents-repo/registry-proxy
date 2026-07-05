@@ -113,11 +113,12 @@ curl -s "https://<worker>.workers.dev/tags"
 
 Notes:
 
-- Legacy flat package paths with only one directory level under `packages/` (for
-  example `packages/hello-agent`, `packages/hello-agent/metadata.json`, or
-  `packages/hello-agent/versions/1.0.0/...`) are rejected with HTTP 400
-  (`legacy_flat_path_not_supported`). Use namespaced paths:
-  `packages/<namespace>/<package-id>/...`.
+- Legacy flat package paths are rejected with HTTP 400
+  (`legacy_flat_path_not_supported`): a bare package id (for example
+  `packages/hello-agent`) or any path whose second segment is `versions` under
+  that id (for example `packages/hello-agent/versions/1.0.0/...`). Other paths
+  under a flat id (such as `packages/hello-agent/metadata.json`) are proxied
+  upstream. Use namespaced paths: `packages/<namespace>/<package-id>/...`.
 - If both path ref and query ref are present, query ref is used.
 - Non-GET methods are rejected with `405 Method Not Allowed`.
 
