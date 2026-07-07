@@ -12,7 +12,9 @@ This repository is a Cloudflare Worker proxy and governance baseline for registr
 
 ## Required Workflow
 
-Contributors and agents MUST follow this lifecycle before implementation:
+Contributors and agents MUST follow this full lifecycle.
+
+### Task setup (before implementation)
 
 1. Inspect issue scope:
    `gh issue view <number> --repo agents-repo/registry-proxy`
@@ -21,7 +23,10 @@ Contributors and agents MUST follow this lifecycle before implementation:
 4. Open a draft pull request using `.github/pull_request_template.md` before
    implementation commits. Pull requests MUST be created as drafts
    (`gh pr create --draft`).
-5. Implement, validate, then hand off. After validation passes, the developer
+
+### Delivery (after draft PR)
+
+1. Implement, validate, then hand off. After validation passes, the developer
    manually marks the pull request ready for review in GitHub. Agents MUST NOT
    merge pull requests into `main`, push directly to `main`, or mark pull
    requests ready for review.
@@ -29,9 +34,11 @@ Contributors and agents MUST follow this lifecycle before implementation:
 All contributors MUST integrate changes to `main` only through merged pull
 requests. Direct commits or pushes to `main` MUST NOT be used.
 
-GitHub requires a pushed remote branch before opening a pull request. An empty
-branch push is acceptable when opening the draft PR before implementation
-commits.
+GitHub cannot open a pull request when the head and base branches are
+identical. Before `gh pr create --draft`, push at least one commit on the task
+branch that creates a diff (for example an empty scaffolding commit:
+`git commit --allow-empty -m "chore: scaffold draft PR for #<issue-number>"`).
+Implementation commits may follow on the same branch.
 
 See [docs/CLI_WORKFLOW.md](../docs/CLI_WORKFLOW.md) for command examples and
 the organization
@@ -89,8 +96,10 @@ Breaking changes should use `!` and include a `BREAKING CHANGE:` footer.
 ## Pull Request Expectations
 
 1. Keep PRs focused and reviewable.
-2. Every PR targeting `main` MUST include `Closes #<issue-number>` in
-   `## Related Issues`.
+2. Every PR targeting `main` MUST include a tracking reference in
+   `## Related Issues`: `Closes #<issue-number>` for standard tasks, or the
+   security-advisory format described in **Workflow exceptions** when
+   applicable.
 3. Include command outputs for validation evidence.
 4. Use deterministic language for behavior and policy updates.
 5. Apply `.github/pull_request_template.md` sections fully.

@@ -33,34 +33,38 @@ Use the matching issue form under `.github/ISSUE_TEMPLATE/` when available.
 Option A:
 
 ```bash
-gh issue develop <issue-number> --name "feat/<issue-number>-short-slug"
+gh issue develop <issue-number> --name "feat/<issue-number>-<slug>"
 ```
 
 Option B:
 
 ```bash
 git checkout main && git pull
-git checkout -b "feat/<issue-number>-short-slug"
+git checkout -b "feat/<issue-number>-<slug>"
 ```
 
 ## 3. Push Branch and Open Draft Pull Request
 
-Push the branch before opening the pull request. An empty branch push is
-acceptable when opening the draft PR before implementation commits.
+GitHub cannot open a pull request when the head and base branches are
+identical. Push at least one commit on the task branch that creates a diff
+before opening the draft PR (for example an empty scaffolding commit):
 
 ```bash
+git commit --allow-empty -m "chore: scaffold draft PR for #<issue-number>"
 git push -u origin HEAD
 
 gh pr create --draft \
   --base main \
-  --head "feat/<issue-number>-short-slug" \
+  --head "feat/<issue-number>-<slug>" \
   --title "feat: short description" \
   --body-file .github/pull_request_template.md
 ```
 
 Then edit PR body to include:
 
-- `Closes #<issue-number>` in `## Related Issues`
+- A tracking reference in `## Related Issues` (`Closes #<issue-number>` for
+  standard tasks, or a security-advisory identifier per `.github/CONTRIBUTING.md`
+  **Workflow exceptions** when applicable)
 - Validation evidence from npm commands
 
 Open the draft PR before implementation commits (`gh pr create --draft`), then

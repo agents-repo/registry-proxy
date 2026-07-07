@@ -35,9 +35,10 @@ List affected paths:
 - [ ] The branch name follows `<prefix>/<issue-number>-<slug>`.
 - [ ] This pull request was created as a draft (`gh pr create --draft` or UI
   draft option).
-- [ ] This draft PR was opened before implementation commits (or documents
+- [ ] This draft PR was opened before implementation commits (or it documents
   why not).
-- [ ] `## Related Issues` includes `Closes #<issue-number>`.
+- [ ] `## Related Issues` includes a tracking reference (`Closes #<issue-number>`
+  or a security-advisory identifier per `.github/CONTRIBUTING.md`).
 - [ ] Issue form was used or equivalent required fields were included.
 - [ ] Merge to `main` is for human maintainers only; agents and automation
   must not merge this PR or push directly to `main`.
@@ -57,4 +58,9 @@ List affected paths:
 
 ## Related Issues
 
-Include `Closes #<issue-number>` for the tracking issue this PR closes.
+Closes #
+
+For standard tasks, use `Closes #<issue-number>`. For security vulnerabilities
+without a public tracking issue, reference the advisory identifier (for example
+`GHSA-...`) and coordinate linkage with maintainers per
+`.github/CONTRIBUTING.md` **Workflow exceptions**.

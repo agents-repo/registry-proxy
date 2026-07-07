@@ -8,15 +8,20 @@ body:
   - type: markdown
     attributes:
       value: |
-        Branch name: `feat/<issue-number>-<short-slug>`
-
-        Create this issue first to obtain the issue number, then open the branch.
-
-        You MUST open a draft pull request targeting `main` before implementation
-        commits (`gh pr create --draft`). The developer manually marks the PR
-        ready for review after validation. Include `Closes #<issue-number>` in `## Related Issues`.
+        **Workflow:** Submit this issue first. After GitHub assigns a number,
+        create your branch and draft PR—do not edit this issue body to add the
+        number.
 
         Use this form for new proxy, CI, or governance capabilities.
+
+        **Branch pattern:** `feat/<issue-number>-<slug>` (use the assigned number
+        and a short lowercase kebab-case slug from the title)
+
+        **Example:** `feat/15-cache-headers`
+
+        **Draft PR:** Open with `gh pr create --draft` before implementation
+        commits. Put the tracking reference in the PR `## Related Issues` section
+        (not in this issue).
 
   - type: textarea
     id: summary
