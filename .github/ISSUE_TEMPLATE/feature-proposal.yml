@@ -20,8 +20,8 @@ body:
         **Example:** `feat/15-cache-headers`
 
         **Draft PR:** Open with `gh pr create --draft` before implementation
-        commits. Put the tracking reference in the PR `## Related Issues` section
-        (not in this issue).
+        commits. For standard tasks, use `Closes #<issue-number>` in the PR
+        `## Related Issues` section (not in this issue).
 
   - type: textarea
     id: summary

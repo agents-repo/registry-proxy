@@ -60,12 +60,13 @@ gh pr create --draft \
   --body-file .github/pull_request_template.md
 ```
 
-Then edit PR body to include:
+Then fill in the template placeholders:
 
-- A tracking reference in `## Related Issues` (`Closes #<issue-number>` for
-  standard tasks, or a security-advisory identifier per the **Workflow
-  exceptions** section of `.github/CONTRIBUTING.md` when applicable)
-- Validation evidence from npm commands
+- Replace the `## Related Issues` placeholder with an unbackticked
+  `Closes #<issue-number>` (or a security-advisory identifier per the
+  **Workflow exceptions** section of `.github/CONTRIBUTING.md` when
+  applicable)
+- Add validation evidence from npm commands
 
 Open the draft PR before implementation commits (`gh pr create --draft`), then
 push additional commits to the same branch as work progresses.

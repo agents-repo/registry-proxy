@@ -5,7 +5,8 @@ description: "Use for Worker proxy implementation and updates."
 
 # Worker Instructions
 
-- Follow `.github/CONTRIBUTING.md` **Required Workflow** before implementation.
+- Follow `.github/CONTRIBUTING.md` **Required Workflow** (issue → branch →
+  push → draft PR before implementation).
 - Keep request handling read-only by default.
 - Preserve intentional path segments and map to configured upstream base URL.
 - Read `GITHUB_TOKEN` from environment only.

@@ -51,7 +51,8 @@ for shared norms.
 1. **Security vulnerabilities** — Follow the private advisory flow. In
    `## Related Issues`, use `Closes #<issue-number>` when maintainers provide
    a linked private or advisory tracking issue. Otherwise, reference the
-   private security advisory identifier in the PR body.
+   private security advisory identifier (for example `GHSA-...`) in
+   `## Related Issues` and coordinate linkage with maintainers.
 
 ## GitHub Communication Method (Preferred)
 
