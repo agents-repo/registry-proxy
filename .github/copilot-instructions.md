@@ -41,9 +41,3 @@ This repository implements a Cloudflare Worker proxy for registry assets.
 - Run `npm run test`.
 - Verify target endpoints return expected statuses.
 - Confirm cache behavior with repeated requests.
-
-## Cursor skills
-
-| Skill | Path | When |
-| --- | --- | --- |
-| `pr-comment-triage` | `.cursor/skills/pr-comment-triage/SKILL.md` | Triage and resolve PR review comments |
