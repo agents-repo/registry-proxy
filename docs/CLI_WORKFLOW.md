@@ -46,8 +46,8 @@ git checkout -b "feat/<issue-number>-<slug>"
 ## 3. Push Branch and Open Draft Pull Request
 
 GitHub cannot open a pull request when the head and base branches are
-identical. Push at least one commit on the task branch that creates a diff
-before opening the draft PR (for example an empty scaffolding commit):
+identical. Push at least one commit on the task branch so its head differs from
+`main` before opening the draft PR (for example an empty commit):
 
 ```bash
 git commit --allow-empty -m "chore: scaffold draft PR for #<issue-number>"
@@ -63,8 +63,8 @@ gh pr create --draft \
 Then edit PR body to include:
 
 - A tracking reference in `## Related Issues` (`Closes #<issue-number>` for
-  standard tasks, or a security-advisory identifier per `.github/CONTRIBUTING.md`
-  **Workflow exceptions** when applicable)
+  standard tasks, or a security-advisory identifier per the **Workflow
+  exceptions** section of `.github/CONTRIBUTING.md` when applicable)
 - Validation evidence from npm commands
 
 Open the draft PR before implementation commits (`gh pr create --draft`), then

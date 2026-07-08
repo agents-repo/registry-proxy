@@ -24,8 +24,8 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 - Do not merge to or push directly to `main`; open a draft PR with
   `gh pr create --draft` before implementation commits. In `## Related Issues`,
   include `Closes #<issue-number>` for standard tasks, or follow the
-  security-advisory format in `.github/CONTRIBUTING.md` **Workflow exceptions**
-  when applicable. Push a scaffolding commit first if needed (see
+  security-advisory format defined in the **Workflow exceptions** section of
+  `.github/CONTRIBUTING.md` when applicable. Push a scaffolding commit first if needed (see
   `.github/CONTRIBUTING.md`). After validation, the developer manually marks the
   pull request ready for review; agents must not mark pull requests ready for
   review.
