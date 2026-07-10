@@ -65,6 +65,32 @@ sections from the intended template in the issue or PR body.
 - Use `caches.default` for cache-first response behavior.
 - Never hardcode or commit token values.
 
+## GitHub Communication Method (gh CLI Preferred)
+
+For GitHub communication in this repository, agents and contributors SHOULD use
+`gh` CLI as the preferred interface for issue and pull request operations.
+
+Preferred command patterns:
+
+- view issue context: `gh issue view <number> --repo agents-repo/registry-proxy`
+- update issue title/body:
+  `gh issue edit <number> --repo agents-repo/registry-proxy --title "..." \
+  --body-file <file>`
+- create issue:
+  `gh issue create --repo agents-repo/registry-proxy --title "..." \
+  --body-file <file>`
+- create draft PR (MUST use `--draft`):
+  `gh pr create --repo agents-repo/registry-proxy --draft --title "..." \
+  --body-file <file>`
+- inspect PR status:
+  `gh pr view <number> --repo agents-repo/registry-proxy --json state,url,title`
+
+For long issue or PR bodies, agents MUST prefer `--body-file` over inline
+quoted text to avoid shell escaping and truncation issues.
+
+If `gh` is unavailable in a task environment, agents MAY use the available
+tooling path, but MUST explicitly note that limitation in the handoff summary.
+
 ## Default Branch Integration (Agents)
 
 - AI agents and coding assistants MUST NOT merge pull requests into `main`

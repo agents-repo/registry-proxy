@@ -53,6 +53,9 @@ for shared norms.
    a linked private or advisory tracking issue. Otherwise, reference the
    private security advisory identifier (for example `GHSA-...`) in
    `## Related Issues` and coordinate linkage with maintainers.
+2. **Maintainer emergency hotfix** — Work on a hotfix branch only with prior
+   maintainer approval documented in an issue or advisory. Delivery to `main`
+   is still via merged pull request (no direct push).
 
 ## GitHub Communication Method (Preferred)
 
@@ -86,6 +89,9 @@ Allowed prefixes:
 - `feat/` for features
 - `chore/` for maintenance
 - `docs/` for documentation
+
+Governance and documentation changes use `docs/` or `chore/` with the
+matching issue form. This repository has no separate spec-change form.
 
 ## Commit Message Convention
 
