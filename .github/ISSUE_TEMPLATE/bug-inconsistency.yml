@@ -8,9 +8,22 @@ body:
   - type: markdown
     attributes:
       value: |
-        Branch name: `fix/<issue-number>-<short-slug>`
+        **Workflow:** Submit this issue first. After GitHub assigns a number,
+        create your branch and draft PR—do not edit this issue body to add the
+        number.
 
-        If you open a PR for this issue, include `Closes #<issue-number>` in `## Related Issues`.
+        Security vulnerabilities MUST NOT be reported in public issues.
+        Use https://github.com/agents-repo/registry-proxy/security/advisories/new
+        for private disclosure instead.
+
+        **Branch pattern:** `fix/<issue-number>-<slug>` (use the assigned number
+        and a short lowercase kebab-case slug from the title)
+
+        **Example:** `fix/42-proxy-cache-mismatch`
+
+        **Draft PR:** Open with `gh pr create --draft` before implementation
+        commits. For standard tasks, use `Closes #<issue-number>` in the PR
+        `## Related Issues` section (not in this issue).
 
   - type: textarea
     id: summary

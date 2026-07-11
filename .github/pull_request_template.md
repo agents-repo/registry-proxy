@@ -4,6 +4,37 @@
 
 Describe the change and why it is needed.
 
+## Related Issues
+
+`Closes #<issue-number>`
+
+Replace the backticked placeholder above with an unbackticked Closes # line (use
+your issue number).
+
+For standard tasks, use `Closes #<issue-number>`. For security vulnerabilities
+without a public tracking issue, reference the advisory identifier (for example
+`GHSA-...`) and coordinate linkage with maintainers per the
+[Workflow exceptions](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#workflow-exceptions)
+section of the organization CONTRIBUTING guide.
+
+## Workflow Checklist
+
+- [ ] A tracking issue was opened before implementation.
+- [ ] The branch name follows `<prefix>/<issue-number>-<slug>`.
+- [ ] This pull request was created as a draft (`gh pr create --draft` or UI
+  draft option).
+- [ ] This draft PR was opened before implementation commits (or it documents
+  why not).
+- [ ] `## Related Issues` includes a tracking reference (`Closes #<issue-number>`
+  or a security-advisory identifier per the
+  [Workflow exceptions](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#workflow-exceptions)
+  section of the organization CONTRIBUTING guide).
+- [ ] Issue form was used or equivalent required fields were included.
+- [ ] Merge to `main` is for human maintainers only; agents and automation
+  must not merge this PR or push directly to `main`.
+- [ ] A human developer marked this PR ready for review after validation (not
+  agents or automation).
+
 ## Change Type
 
 - [ ] Feature
@@ -31,9 +62,6 @@ List affected paths:
 - [ ] Test command passes (`npm run test`).
 - [ ] Documentation remains deterministic and clear.
 - [ ] PR follows `.github/pull_request_template.md` sections.
-- [ ] Issue form was used or equivalent required fields were included.
-- [ ] Merge to `main` is for human maintainers only; agents and automation
-  must not merge this PR or push directly to `main`.
 
 ## Validation Evidence
 
@@ -45,7 +73,3 @@ List affected paths:
 
 - Risk level: low / medium / high
 - Rollback plan:
-
-## Related Issues
-
-- Closes #ISSUE_NUMBER

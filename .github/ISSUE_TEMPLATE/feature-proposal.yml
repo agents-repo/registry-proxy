@@ -8,9 +8,20 @@ body:
   - type: markdown
     attributes:
       value: |
-        Branch name: `feat/<issue-number>-<short-slug>`
+        **Workflow:** Submit this issue first. After GitHub assigns a number,
+        create your branch and draft PR—do not edit this issue body to add the
+        number.
 
         Use this form for new proxy, CI, or governance capabilities.
+
+        **Branch pattern:** `feat/<issue-number>-<slug>` (use the assigned number
+        and a short lowercase kebab-case slug from the title)
+
+        **Example:** `feat/15-cache-headers`
+
+        **Draft PR:** Open with `gh pr create --draft` before implementation
+        commits. For standard tasks, use `Closes #<issue-number>` in the PR
+        `## Related Issues` section (not in this issue).
 
   - type: textarea
     id: summary

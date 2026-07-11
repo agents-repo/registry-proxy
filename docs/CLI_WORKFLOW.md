@@ -1,6 +1,8 @@
 # GitHub CLI Workflow
 
-This project uses an issue-first workflow with GitHub CLI.
+This project uses a required issue → branch → push → draft PR workflow with
+GitHub CLI. See `.github/CONTRIBUTING.md` **Required Workflow** for normative
+rules.
 
 ## 0. Bootstrap Local Runtime
 
@@ -24,49 +26,75 @@ gh issue create \
   --body "Scope, acceptance criteria, and validation plan"
 ```
 
+Use the matching issue form under `.github/ISSUE_TEMPLATE/` when available.
+
 ## 2. Create Branch From Issue Context
 
 Option A:
 
 ```bash
-gh issue develop <issue-number> --name "feat/<issue-number>-short-slug"
+gh issue develop <issue-number> --name "feat/<issue-number>-<slug>"
 ```
 
 Option B:
 
 ```bash
-git checkout -b "feat/<issue-number>-short-slug"
+git checkout main && git pull
+git checkout -b "feat/<issue-number>-<slug>"
 ```
 
-## 3. Open Pull Request
+## 3. Push Branch and Open Draft Pull Request
+
+GitHub cannot open a pull request when the head and base branches are
+identical. Push at least one commit on the task branch so its head differs from
+`main` before opening the draft PR (for example an empty commit):
 
 ```bash
-gh pr create \
+git commit --allow-empty -m "chore: scaffold draft PR for #<issue-number>"
+git push -u origin HEAD
+
+gh pr create --draft \
   --base main \
-  --head "feat/<issue-number>-short-slug" \
+  --head "feat/<issue-number>-<slug>" \
   --title "feat: short description" \
   --body-file .github/pull_request_template.md
 ```
 
-Then edit PR body to include:
+Then fill in the template placeholders:
 
-- `Closes #<issue-number>` in `## Related Issues`
-- Validation evidence from npm commands
+- Replace the `## Related Issues` placeholder with an unbackticked
+  `Closes #<issue-number>` (or a security-advisory identifier per the
+  **Workflow exceptions** section of `.github/CONTRIBUTING.md` when
+  applicable)
+- Add validation evidence from npm commands
 
-## 4. Review and Merge
+Open the draft PR before implementation commits (`gh pr create --draft`), then
+push additional commits to the same branch as work progresses.
 
-```bash
-gh pr view <pr-number>
-gh pr merge <pr-number> --squash
-```
-
-## 5. Required Local Validation Before Review
+## 4. Implement and Validate
 
 ```bash
 npm run env:check
 npm run lint:all
 npm run check:secrets
 npm run test
+```
+
+## 5. Mark Ready and Merge (Human Maintainers Only)
+
+After validation passes, the developer manually marks the pull request ready
+for review in GitHub. Agents and automation MUST NOT mark pull requests ready
+for review.
+
+```bash
+gh pr view <pr-number>
+```
+
+Human maintainers merge after review. Agents and automation MUST NOT run
+`gh pr merge` or push directly to `main`.
+
+```bash
+gh pr merge <pr-number> --squash
 ```
 
 ## Fallback Without gh
