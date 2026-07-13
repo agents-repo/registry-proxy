@@ -10,7 +10,7 @@ Run the pinned runtime setup before validation commands:
 
 ```bash
 nvm use
-corepack enable
+corepack enable npm
 corepack prepare npm@12.0.1 --activate
 npm --version
 npm run env:check

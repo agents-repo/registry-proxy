@@ -13,7 +13,7 @@ Setup:
 
 ```bash
 nvm use
-corepack enable
+corepack enable npm
 corepack prepare npm@12.0.1 --activate
 node --version
 npm --version
