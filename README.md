@@ -25,9 +25,15 @@ npm run env:check
 
 npm 12 may block dependency install scripts until approved. This repository
 currently has no allowlisted scripts; CI verifies `npm ci` leaves no
-unreviewed scripts. If a future dependency needs install scripts, approve it
-with `npm install-scripts approve <name>@<version>` and add the entry to
-`package.json` `allowScripts`.
+unreviewed scripts. If a future dependency needs install scripts:
+
+```bash
+npm install-scripts ls
+npm install-scripts approve <name>@<version>
+```
+
+`npm install-scripts approve` writes the `allowScripts` entry to
+`package.json`; commit that change with your dependency update.
 
 Expected version output before continuing:
 
