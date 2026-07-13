@@ -7,14 +7,14 @@ Cloudflare Worker proxy for files in the GitHub repository agents-repo/registry 
 Use pinned runtime versions for consistent local and CI behavior.
 
 - Node.js: `24.15.0` (`.nvmrc` and `.node-version`)
-- npm: `11.12.1` (`packageManager` in `package.json`)
+- npm: `12.0.1` (`packageManager` in `package.json`)
 
 Setup:
 
 ```bash
 nvm use
 corepack enable
-corepack prepare npm@11.12.1 --activate
+corepack prepare npm@12.0.1 --activate
 node --version
 npm --version
 npm ci
@@ -24,7 +24,7 @@ npm run env:check
 Expected version output before continuing:
 
 - Node.js: `v24.15.0`
-- npm: `11.12.1`
+- npm: `12.0.1`
 
 If npm still resolves to a different version, ensure Corepack-managed npm is active in your shell before running project scripts.
 

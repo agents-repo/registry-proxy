@@ -11,12 +11,12 @@ Run the pinned runtime setup before validation commands:
 ```bash
 nvm use
 corepack enable
-corepack prepare npm@11.12.1 --activate
+corepack prepare npm@12.0.1 --activate
 npm --version
 npm run env:check
 ```
 
-Continue only when npm resolves to `11.12.1`.
+Continue only when npm resolves to `12.0.1`.
 
 ## 1. Create Issue
 
