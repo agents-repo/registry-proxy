@@ -400,10 +400,6 @@ function withTagsClientResponse(response) {
   });
 }
 
-function buildTagsListingResponse(tags, cachedAtMs = Date.now()) {
-  return withTagsClientResponse(buildTagsCacheResponse(tags, cachedAtMs));
-}
-
 function buildUpstreamRequest(target, env, requestHeaders) {
   const headers = new Headers();
   const requestAccept = requestHeaders.get("Accept") || "*/*";
@@ -441,7 +437,6 @@ export {
   buildTagsApiUrl,
   buildTagsCacheKey,
   buildTagsCacheResponse,
-  buildTagsListingResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,

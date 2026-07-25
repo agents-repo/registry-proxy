@@ -237,7 +237,8 @@ test("fetch serves stale tags cache when upstream fetch fails", async () => {
     globalThis.caches = {
       default: {
         async match(request) {
-          return cacheStore.get(request.url);
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
         },
         async put() {},
       },
@@ -254,6 +255,48 @@ test("fetch serves stale tags cache when upstream fetch fails", async () => {
     );
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), [{ name: "v1.2.0" }]);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves stale tags cache when upstream tags API returns non-OK", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
+    const staleResponse = buildTagsCacheResponse([{ name: "v1.1.0" }], staleCachedAtMs);
+    const cacheKeyUrl = buildTagsCacheKey().url;
+    cacheStore.set(cacheKeyUrl, staleResponse);
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () =>
+      new Response('{"message":"rate limit"}', {
+        status: 403,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/tags"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [{ name: "v1.1.0" }]);
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
