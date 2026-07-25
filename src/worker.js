@@ -4,6 +4,8 @@ const RAW_BASE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAM
 const CONTENTS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents`;
 const TAGS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/tags`;
 const TAGS_API_PAGE_SIZE = 100;
+const TAGS_EDGE_TTL_SECONDS = 300;
+const TAGS_CACHED_AT_HEADER = "X-Registry-Proxy-Tags-Cached-At";
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 const CORS_ALLOW_ORIGIN = "*";
@@ -326,9 +328,6 @@ async function fetchAllRepositoryTags(env) {
       upstreamResponse = await fetch(nextUrl, {
         method: "GET",
         headers,
-        cf: {
-          cacheEverything: true,
-        },
       });
     } catch {
       throw new Error("tags_upstream_fetch_failed");
@@ -359,6 +358,31 @@ async function fetchAllRepositoryTags(env) {
 
 function buildTagsCacheKey() {
   return new Request(`${TAGS_API_BASE_URL}?per_page=${TAGS_API_PAGE_SIZE}`, { method: "GET" });
+}
+
+function getTagsCachedAtMs(response) {
+  const rawValue = response.headers.get(TAGS_CACHED_AT_HEADER);
+  if (!rawValue) {
+    return null;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function isTagsEdgeCacheFresh(cachedAtMs, nowMs = Date.now()) {
+  return nowMs - cachedAtMs <= TAGS_EDGE_TTL_SECONDS * 1000;
+}
+
+function buildTagsListingResponse(tags, cachedAtMs = Date.now()) {
+  return withCors(new Response(JSON.stringify(tags, null, 2), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "Cache-Control": `public, max-age=${TAGS_EDGE_TTL_SECONDS}`,
+      [TAGS_CACHED_AT_HEADER]: String(cachedAtMs),
+    },
+  }));
 }
 
 function buildUpstreamRequest(target, env, requestHeaders) {
@@ -396,15 +420,20 @@ function buildUpstreamRequest(target, env, requestHeaders) {
 export {
   buildContentsApiUrl,
   buildTagsApiUrl,
+  buildTagsListingResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
+  getTagsCachedAtMs,
   isLegacyFlatPackagePath,
+  isTagsEdgeCacheFresh,
   normalizePath,
   normalizeRef,
   splitPathStyle,
   TAGS_API_BASE_URL,
+  TAGS_CACHED_AT_HEADER,
+  TAGS_EDGE_TTL_SECONDS,
   UPSTREAM_USER_AGENT,
 };
 
@@ -445,7 +474,10 @@ export default {
       const cacheKey = buildTagsCacheKey();
       const cached = await cache.match(cacheKey);
       if (cached) {
-        return withCors(cached);
+        const cachedAtMs = getTagsCachedAtMs(cached);
+        if (cachedAtMs !== null && isTagsEdgeCacheFresh(cachedAtMs)) {
+          return cached;
+        }
       }
 
       let tagsResult;
@@ -466,7 +498,7 @@ export default {
         return withCors(response);
       }
 
-      const response = jsonResponse(tagsResult.tags, 200);
+      const response = buildTagsListingResponse(tagsResult.tags);
       ctx.waitUntil(cache.put(cacheKey, response.clone()));
       return response;
     }
