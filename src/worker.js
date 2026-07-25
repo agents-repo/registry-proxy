@@ -484,10 +484,18 @@ export default {
       try {
         tagsResult = await fetchAllRepositoryTags(env);
       } catch {
+        if (cached) {
+          return cached;
+        }
+
         return withCors(new Response("Bad Gateway", { status: 502 }));
       }
 
       if (!tagsResult.ok) {
+        if (cached) {
+          return cached;
+        }
+
         const response = new Response(tagsResult.body, {
           status: tagsResult.status,
           statusText: tagsResult.statusText,

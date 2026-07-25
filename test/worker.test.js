@@ -219,6 +219,43 @@ test("isTagsEdgeCacheFresh respects TTL boundary", () => {
   assert.equal(isTagsEdgeCacheFresh(nowMs - (TAGS_EDGE_TTL_SECONDS * 1000 + 1), nowMs), false);
 });
 
+test("fetch serves stale tags cache when upstream fetch fails", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
+    const staleResponse = buildTagsListingResponse([{ name: "v1.2.0" }], staleCachedAtMs);
+    const cacheKeyUrl = `${TAGS_API_BASE_URL}?per_page=100`;
+    cacheStore.set(cacheKeyUrl, staleResponse);
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => {
+      throw new Error("tags_upstream_fetch_failed");
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/tags"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [{ name: "v1.2.0" }]);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("fetch preserves upstream tags API errors", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
