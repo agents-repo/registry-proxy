@@ -17,6 +17,14 @@ wrangler secret put GITHUB_TOKEN
 
 The Worker also works without this secret for public upstream content, but authenticated requests are more resilient to upstream rate limits.
 
+Verify the secret is configured for a deployed worker (does not print the token):
+
+```bash
+wrangler secret list
+```
+
+Expect `GITHUB_TOKEN` in the list for the production worker name.
+
 ## Deploy
 
 ```bash

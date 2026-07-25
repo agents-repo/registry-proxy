@@ -3,15 +3,20 @@ import assert from "node:assert/strict";
 import worker, {
   buildContentsApiUrl,
   buildTagsApiUrl,
+  buildTagsCacheKey,
+  buildTagsCacheResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
   isLegacyFlatPackagePath,
+  isTagsEdgeCacheFresh,
   normalizePath,
   normalizeRef,
   splitPathStyle,
   TAGS_API_BASE_URL,
+  TAGS_CACHED_AT_HEADER,
+  TAGS_EDGE_TTL_SECONDS,
   UPSTREAM_USER_AGENT,
 } from "../src/worker.js";
 
@@ -79,6 +84,8 @@ test("fetch returns tags listing with CORS and pagination", async () => {
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(response.headers.get("content-type"), "application/json; charset=utf-8");
+    assert.equal(response.headers.get("Cache-Control"), `public, max-age=${TAGS_EDGE_TTL_SECONDS}`);
+    assert.match(response.headers.get(TAGS_CACHED_AT_HEADER) ?? "", /^\d+$/);
     assert.deepEqual(await response.json(), [
       { name: "v1.2.0" },
       { name: "v1.1.0" },
@@ -92,6 +99,8 @@ test("fetch returns tags listing with CORS and pagination", async () => {
 });
 
 test("fetch caches tags listing on success", async () => {
+  // In-memory cache mocks do not emulate Cloudflare Cache-Control eviction; TTL is
+  // enforced in the worker via X-Registry-Proxy-Tags-Cached-At on stored entries.
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
 
@@ -141,6 +150,153 @@ test("fetch caches tags listing on success", async () => {
     assert.equal(secondResponse.status, 200);
     assert.deepEqual(await secondResponse.json(), [{ name: "v1.2.0" }]);
     assert.equal(fetchCount, 1);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch re-fetches tags listing after edge TTL expires", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    let fetchCount = 0;
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      const tagName = fetchCount === 1 ? "v1.2.0" : "v1.3.0";
+      return new Response(JSON.stringify([{ name: tagName }]), {
+        status: 200,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+    };
+
+    const waitUntilPromises = [];
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    };
+
+    const request = new Request("https://worker.example/tags");
+    const firstResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(firstResponse.status, 200);
+    assert.deepEqual(await firstResponse.json(), [{ name: "v1.2.0" }]);
+    assert.equal(fetchCount, 1);
+    await Promise.all(waitUntilPromises);
+
+    const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
+    const staleResponse = buildTagsCacheResponse([{ name: "v1.2.0" }], staleCachedAtMs);
+    const cacheKeyUrl = buildTagsCacheKey().url;
+    cacheStore.set(cacheKeyUrl, staleResponse);
+
+    const secondResponse = await worker.fetch(request, {}, { waitUntil() {} });
+    assert.equal(secondResponse.status, 200);
+    assert.deepEqual(await secondResponse.json(), [{ name: "v1.3.0" }]);
+    assert.equal(fetchCount, 2);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("isTagsEdgeCacheFresh respects TTL boundary", () => {
+  const nowMs = 1_700_000_000_000;
+  assert.equal(isTagsEdgeCacheFresh(nowMs, nowMs), true);
+  assert.equal(isTagsEdgeCacheFresh(nowMs - TAGS_EDGE_TTL_SECONDS * 1000, nowMs), true);
+  assert.equal(isTagsEdgeCacheFresh(nowMs - (TAGS_EDGE_TTL_SECONDS * 1000 + 1), nowMs), false);
+  assert.equal(isTagsEdgeCacheFresh(nowMs + 1, nowMs), false);
+});
+
+test("fetch serves stale tags cache when upstream fetch fails", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
+    const staleResponse = buildTagsCacheResponse([{ name: "v1.2.0" }], staleCachedAtMs);
+    const cacheKeyUrl = buildTagsCacheKey().url;
+    cacheStore.set(cacheKeyUrl, staleResponse);
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => {
+      throw new Error("tags_upstream_fetch_failed");
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/tags"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [{ name: "v1.2.0" }]);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves stale tags cache when upstream tags API returns non-OK", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
+    const staleResponse = buildTagsCacheResponse([{ name: "v1.1.0" }], staleCachedAtMs);
+    const cacheKeyUrl = buildTagsCacheKey().url;
+    cacheStore.set(cacheKeyUrl, staleResponse);
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () =>
+      new Response('{"message":"rate limit"}', {
+        status: 403,
+        headers: {
+          "content-type": "application/json",
+        },
+      });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/tags"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), [{ name: "v1.1.0" }]);
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;

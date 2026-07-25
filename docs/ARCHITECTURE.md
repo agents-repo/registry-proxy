@@ -31,6 +31,12 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 - Upstream: `https://api.github.com/repos/agents-repo/registry/tags?per_page=100` with pagination until all pages are fetched
 - Response: aggregated JSON array `[{ "name": "v1.2.0" }, ...]` (GitHub-compatible)
 - Cache key: stable tags API URL for page 1
+- Edge cache TTL: **300 seconds** (`TAGS_EDGE_TTL_SECONDS`). The worker stores
+  `X-Registry-Proxy-Tags-Cached-At` on cached `/tags` responses and re-fetches
+  upstream when that age exceeds the TTL. Client responses include
+  `Cache-Control: public, max-age=300`. Cached `cache.put` entries omit
+  `Cache-Control` so the Workers Cache API does not evict them before the worker
+  TTL check.
 - Path-style routes such as `/main/tags` remain file proxy requests, not tag listing
 
 ## Method Policy
@@ -45,5 +51,5 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 
 ## Known Limitations
 
-- No custom cache TTL controls in current version.
+- File proxy responses use Cloudflare edge cache without worker-enforced TTL (tags listing is the exception; see **Tags Listing**).
 - No write operations are supported.
