@@ -374,15 +374,30 @@ function isTagsEdgeCacheFresh(cachedAtMs, nowMs = Date.now()) {
   return nowMs - cachedAtMs <= TAGS_EDGE_TTL_SECONDS * 1000;
 }
 
-function buildTagsListingResponse(tags, cachedAtMs = Date.now()) {
-  return withCors(new Response(JSON.stringify(tags, null, 2), {
+function buildTagsCacheResponse(tags, cachedAtMs = Date.now()) {
+  return new Response(JSON.stringify(tags, null, 2), {
     status: 200,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "Cache-Control": `public, max-age=${TAGS_EDGE_TTL_SECONDS}`,
       [TAGS_CACHED_AT_HEADER]: String(cachedAtMs),
     },
-  }));
+  });
+}
+
+function withTagsClientResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", CORS_ALLOW_ORIGIN);
+  headers.set("Cache-Control", `public, max-age=${TAGS_EDGE_TTL_SECONDS}`);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function buildTagsListingResponse(tags, cachedAtMs = Date.now()) {
+  return withTagsClientResponse(buildTagsCacheResponse(tags, cachedAtMs));
 }
 
 function buildUpstreamRequest(target, env, requestHeaders) {
@@ -420,6 +435,7 @@ function buildUpstreamRequest(target, env, requestHeaders) {
 export {
   buildContentsApiUrl,
   buildTagsApiUrl,
+  buildTagsCacheResponse,
   buildTagsListingResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
@@ -476,7 +492,7 @@ export default {
       if (cached) {
         const cachedAtMs = getTagsCachedAtMs(cached);
         if (cachedAtMs !== null && isTagsEdgeCacheFresh(cachedAtMs)) {
-          return cached;
+          return withTagsClientResponse(cached);
         }
       }
 
@@ -485,7 +501,7 @@ export default {
         tagsResult = await fetchAllRepositoryTags(env);
       } catch {
         if (cached) {
-          return cached;
+          return withTagsClientResponse(cached);
         }
 
         return withCors(new Response("Bad Gateway", { status: 502 }));
@@ -493,7 +509,7 @@ export default {
 
       if (!tagsResult.ok) {
         if (cached) {
-          return cached;
+          return withTagsClientResponse(cached);
         }
 
         const response = new Response(tagsResult.body, {
@@ -506,9 +522,9 @@ export default {
         return withCors(response);
       }
 
-      const response = buildTagsListingResponse(tagsResult.tags);
-      ctx.waitUntil(cache.put(cacheKey, response.clone()));
-      return response;
+      const cacheResponse = buildTagsCacheResponse(tagsResult.tags);
+      ctx.waitUntil(cache.put(cacheKey, cacheResponse.clone()));
+      return withTagsClientResponse(cacheResponse);
     }
 
     const upstreamRequest = buildUpstreamRequest(target, env, request.headers);

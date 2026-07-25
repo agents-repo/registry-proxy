@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import worker, {
   buildContentsApiUrl,
   buildTagsApiUrl,
-  buildTagsListingResponse,
+  buildTagsCacheResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
@@ -98,6 +98,8 @@ test("fetch returns tags listing with CORS and pagination", async () => {
 });
 
 test("fetch caches tags listing on success", async () => {
+  // In-memory cache mocks do not emulate Cloudflare Cache-Control eviction; TTL is
+  // enforced in the worker via X-Registry-Proxy-Tags-Cached-At on stored entries.
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
 
@@ -198,7 +200,7 @@ test("fetch re-fetches tags listing after edge TTL expires", async () => {
     await Promise.all(waitUntilPromises);
 
     const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
-    const staleResponse = buildTagsListingResponse([{ name: "v1.2.0" }], staleCachedAtMs);
+    const staleResponse = buildTagsCacheResponse([{ name: "v1.2.0" }], staleCachedAtMs);
     const cacheKeyUrl = `${TAGS_API_BASE_URL}?per_page=100`;
     cacheStore.set(cacheKeyUrl, staleResponse);
 
@@ -226,7 +228,7 @@ test("fetch serves stale tags cache when upstream fetch fails", async () => {
   try {
     const cacheStore = new Map();
     const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
-    const staleResponse = buildTagsListingResponse([{ name: "v1.2.0" }], staleCachedAtMs);
+    const staleResponse = buildTagsCacheResponse([{ name: "v1.2.0" }], staleCachedAtMs);
     const cacheKeyUrl = `${TAGS_API_BASE_URL}?per_page=100`;
     cacheStore.set(cacheKeyUrl, staleResponse);
 
