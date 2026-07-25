@@ -371,6 +371,10 @@ function getTagsCachedAtMs(response) {
 }
 
 function isTagsEdgeCacheFresh(cachedAtMs, nowMs = Date.now()) {
+  if (cachedAtMs > nowMs) {
+    return false;
+  }
+
   return nowMs - cachedAtMs <= TAGS_EDGE_TTL_SECONDS * 1000;
 }
 
@@ -435,6 +439,7 @@ function buildUpstreamRequest(target, env, requestHeaders) {
 export {
   buildContentsApiUrl,
   buildTagsApiUrl,
+  buildTagsCacheKey,
   buildTagsCacheResponse,
   buildTagsListingResponse,
   buildUpstreamRequest,

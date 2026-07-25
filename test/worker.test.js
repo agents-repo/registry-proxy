@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import worker, {
   buildContentsApiUrl,
   buildTagsApiUrl,
+  buildTagsCacheKey,
   buildTagsCacheResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
@@ -201,7 +202,7 @@ test("fetch re-fetches tags listing after edge TTL expires", async () => {
 
     const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
     const staleResponse = buildTagsCacheResponse([{ name: "v1.2.0" }], staleCachedAtMs);
-    const cacheKeyUrl = `${TAGS_API_BASE_URL}?per_page=100`;
+    const cacheKeyUrl = buildTagsCacheKey().url;
     cacheStore.set(cacheKeyUrl, staleResponse);
 
     const secondResponse = await worker.fetch(request, {}, { waitUntil() {} });
@@ -219,6 +220,7 @@ test("isTagsEdgeCacheFresh respects TTL boundary", () => {
   assert.equal(isTagsEdgeCacheFresh(nowMs, nowMs), true);
   assert.equal(isTagsEdgeCacheFresh(nowMs - TAGS_EDGE_TTL_SECONDS * 1000, nowMs), true);
   assert.equal(isTagsEdgeCacheFresh(nowMs - (TAGS_EDGE_TTL_SECONDS * 1000 + 1), nowMs), false);
+  assert.equal(isTagsEdgeCacheFresh(nowMs + 1, nowMs), false);
 });
 
 test("fetch serves stale tags cache when upstream fetch fails", async () => {
@@ -229,7 +231,7 @@ test("fetch serves stale tags cache when upstream fetch fails", async () => {
     const cacheStore = new Map();
     const staleCachedAtMs = Date.now() - (TAGS_EDGE_TTL_SECONDS + 1) * 1000;
     const staleResponse = buildTagsCacheResponse([{ name: "v1.2.0" }], staleCachedAtMs);
-    const cacheKeyUrl = `${TAGS_API_BASE_URL}?per_page=100`;
+    const cacheKeyUrl = buildTagsCacheKey().url;
     cacheStore.set(cacheKeyUrl, staleResponse);
 
     globalThis.caches = {
