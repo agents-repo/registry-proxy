@@ -63,7 +63,8 @@ List affected paths:
 - [ ] Documentation remains deterministic and clear.
 - [ ] Pre-ready self-review completed per [Pre-ready agent handoff][org-pre-ready]
   (draft PR updated with validation evidence).
-- [ ] Pull request remains draft until a human marks it ready for review.
+- [ ] For PRs opened by agents: remains draft until a human marks it ready for
+  review (not applicable to human-opened non-draft PRs).
 - [ ] PR follows `.github/pull_request_template.md` sections.
 
 ## Validation Evidence
