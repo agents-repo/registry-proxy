@@ -51,8 +51,9 @@ Required command baseline:
 - `npm run check:secrets`
 - `npm run test`
 
-When behavior changes, also verify target endpoints and cache behavior per
-`.github/copilot-instructions.md` **Required Validation**.
+For worker routing or caching changes, also run the endpoint and cache checks
+listed in `.github/copilot-instructions.md` **Required Validation** (in addition
+to the command baseline above).
 
 ## Pre-ready handoff
 
