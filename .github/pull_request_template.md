@@ -61,6 +61,8 @@ List affected paths:
 - [ ] Secret scan passes (`npm run check:secrets`).
 - [ ] Test command passes (`npm run test`).
 - [ ] Documentation remains deterministic and clear.
+- [ ] Pre-ready self-review completed per org CONTRIBUTING (draft PR updated with validation evidence).
+- [ ] Pull request remains draft until a human marks it ready for review.
 - [ ] PR follows `.github/pull_request_template.md` sections.
 
 ## Validation Evidence
