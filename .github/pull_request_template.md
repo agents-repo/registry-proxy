@@ -61,6 +61,10 @@ List affected paths:
 - [ ] Secret scan passes (`npm run check:secrets`).
 - [ ] Test command passes (`npm run test`).
 - [ ] Documentation remains deterministic and clear.
+- [ ] Pre-ready self-review completed per [Pre-ready agent handoff][org-pre-ready]
+  (draft PR updated with validation evidence).
+- [ ] For PRs opened by agents: remains draft until a human marks it ready for
+  review (not applicable to human-opened non-draft PRs).
 - [ ] PR follows `.github/pull_request_template.md` sections.
 
 ## Validation Evidence
@@ -73,3 +77,5 @@ List affected paths:
 
 - Risk level: low / medium / high
 - Rollback plan:
+
+[org-pre-ready]: https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pre-ready-agent-handoff

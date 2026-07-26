@@ -51,6 +51,23 @@ Required command baseline:
 - `npm run check:secrets`
 - `npm run test`
 
+For worker routing or caching changes, also run the endpoint and cache checks
+listed in `.github/copilot-instructions.md` **Required Validation** (in addition
+to the command baseline above).
+
+## Pre-ready handoff
+
+Before agent handoff (while the pull request remains a **draft**), follow the
+organization
+[Pre-ready agent handoff](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pre-ready-agent-handoff):
+
+- read exemplar code in the same area before editing
+- run the verification commands above (and endpoint/cache checks when applicable)
+- self-review correctness, security, and docs alignment
+- update the draft PR description with validation evidence and out-of-scope items
+
+Agents MUST NOT mark pull requests ready for review.
+
 ## Handoff Checklist
 
 - Acceptance criteria status (pass/fail).
