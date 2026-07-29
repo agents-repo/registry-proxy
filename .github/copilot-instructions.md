@@ -1,4 +1,4 @@
-# Copilot Project Instructions
+# Registry proxy — project guidelines
 
 This repository implements a Cloudflare Worker proxy for registry assets.
 

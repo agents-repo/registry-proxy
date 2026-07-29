@@ -62,14 +62,15 @@ for shared norms.
 Use `gh` CLI for issue and pull request communication when possible.
 
 Repo-wide instructions live in `.github/copilot-instructions.md`. Path-scoped
-Copilot instructions under `.github/instructions/*.instructions.md` remain in
+GitHub Copilot instructions under `.github/instructions/*.instructions.md` remain in
 effect for matching files and supplement the repo-wide guide.
 
 ## IDE deployment mirrors
 
-| Path | Source |
-| --- | --- |
-| `.cursor/rules/agents-registry-proxy.mdc` | `.github/copilot-instructions.md` |
+| Tool | Path | Source |
+| --- | --- | --- |
+| GitHub Copilot | `.github/copilot-instructions.md` | (canonical) |
+| Cursor | `.cursor/rules/agents-registry-proxy.mdc` | `.github/copilot-instructions.md` |
 
 Regenerate after editing `copilot-instructions.md`:
 
