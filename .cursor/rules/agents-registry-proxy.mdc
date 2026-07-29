@@ -5,7 +5,7 @@ alwaysApply: true
 
 <!-- Generated from .github/copilot-instructions.md — do not edit; run npm run sync:cursor-rules -->
 
-# Copilot Project Instructions
+# Registry proxy — project guidelines
 
 This repository implements a Cloudflare Worker proxy for registry assets.
 
