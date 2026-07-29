@@ -11,11 +11,11 @@ run_checks() {
   if command -v corepack >/dev/null 2>&1; then
     corepack npm run lint:all || return $?
     corepack npm run test:sync || return $?
-    corepack npm run sync:cursor-rules -- --check
+    corepack npm run sync:ide-instructions -- --check
   else
     npm run lint:all || return $?
     npm run test:sync || return $?
-    npm run sync:cursor-rules -- --check
+    npm run sync:ide-instructions -- --check
   fi
 }
 

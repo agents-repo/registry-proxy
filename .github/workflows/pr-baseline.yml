@@ -20,8 +20,16 @@ jobs:
       - name: Run lints
         run: npm run lint:all
 
-      - name: Check Cursor rule mirror
-        run: npm run sync:cursor-rules -- --check
+      - name: Check IDE instruction mirrors
+        run: npm run sync:ide-instructions -- --check
+
+      - name: Verify registry package installs match lockfile
+        run: |
+          rm -rf .github/agents .cursor/skills .claude/agents .agents/skills
+          npx agents-repo@1.13.0 install
+          git diff --exit-code -- \
+            agents.json agents-lock.json \
+            .github/agents .cursor/skills .claude/agents .agents/skills
 
       - name: Run tests
         run: npm run test

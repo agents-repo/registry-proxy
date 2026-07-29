@@ -65,20 +65,36 @@ Repo-wide instructions live in `.github/copilot-instructions.md`. Path-scoped
 GitHub Copilot instructions under `.github/instructions/*.instructions.md` remain in
 effect for matching files and supplement the repo-wide guide.
 
-## IDE deployment mirrors
+## IDE setup
 
-| Tool | Path | Source |
+### Project guidelines (repo-specific)
+
+| Install target | Path | Source |
 | --- | --- | --- |
-| GitHub Copilot | `.github/copilot-instructions.md` | (canonical) |
-| Cursor | `.cursor/rules/agents-registry-proxy.mdc` | `.github/copilot-instructions.md` |
+| GitHub Copilot | `.github/copilot-instructions.md` | **Canonical** — edit here |
+| Cursor | `.cursor/rules/agents-registry-proxy.mdc` | Mirrored from copilot-instructions |
+| Claude Code | `CLAUDE.md` | Mirrored from copilot-instructions |
+| OpenAI Codex | `AGENTS.md` | Mirrored from copilot-instructions |
 
-Regenerate after editing `copilot-instructions.md`:
+Regenerate mirrors after editing `copilot-instructions.md`:
 
 ```bash
-npm run sync:cursor-rules
+npm run sync:ide-instructions
 ```
 
-Do not edit `.cursor/rules/` directly.
+Do not edit `.cursor/rules/`, `CLAUDE.md`, or `AGENTS.md` directly.
+
+### Registry workflow packages (CLI)
+
+Install and refresh catalog packages with the [agents-repo CLI](https://github.com/agents-repo/cli):
+
+```bash
+npx agents-repo init --targets github-copilot claude-code cursor openai-codex
+npx agents-repo install    # bulk sync from agents.json
+npx agents-repo update       # refresh within semver ranges
+```
+
+Commit `agents.json`, `agents-lock.json`, and extracted paths (`.github/agents/`, `.cursor/skills/`, `.claude/agents/`, `.agents/skills/`). Do not hand-edit extracted package files.
 
 ## Branch Naming
 
