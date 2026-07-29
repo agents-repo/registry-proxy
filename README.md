@@ -169,7 +169,7 @@ Example:
 - Pull request template: `.github/pull_request_template.md`
 - GitHub Copilot project instructions: `.github/copilot-instructions.md`
 - Cursor project rules: `.cursor/rules/agents-registry-proxy.mdc`
-- Cursor sync: `npm run sync:cursor-rules` (after editing copilot instructions)
+- Cursor sync: `npm run sync:cursor-rules` (after editing `.github/copilot-instructions.md`)
 - CI workflows: `.github/workflows/`
 - Code ownership: `.github/CODEOWNERS`
 

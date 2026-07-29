@@ -31,7 +31,7 @@ describe('sync-cursor-rules', () => {
   it('writes mirror with frontmatter and generated comment', async () => {
     const repo = makeTempRepo();
     tempRepos.push(repo);
-    const source = '# Copilot Project Instructions\n\n## Guardrails\n';
+    const source = '# Registry proxy — project guidelines\n\n## Guardrails\n';
     fs.writeFileSync(path.join(repo, '.github', 'copilot-instructions.md'), source, 'utf-8');
 
     const { execFile } = await import('node:child_process');
@@ -45,14 +45,14 @@ describe('sync-cursor-rules', () => {
     );
     assert.match(output, /alwaysApply: true/);
     assert.match(output, /Generated from \.github\/copilot-instructions\.md/);
-    assert.match(output, /# Copilot Project Instructions/);
+    assert.match(output, /# Registry proxy — project guidelines/);
   });
 
   it('rewrites relative markdown links for the mirror directory depth', async () => {
     const repo = makeTempRepo();
     tempRepos.push(repo);
     const source = [
-      '# Copilot Project Instructions',
+      '# Registry proxy — project guidelines',
       '',
       '1. Read [../docs/AI_GUIDELINES.md](../docs/AI_GUIDELINES.md).',
       '2. Read [../CONTRIBUTING.md](../CONTRIBUTING.md).',
