@@ -1,8 +1,3 @@
----
-description: Registry proxy project guidelines (mirrors copilot-instructions.md)
-alwaysApply: true
----
-
 <!-- Generated: .github/copilot-instructions.md. Run npm run sync:ide-instructions -->
 
 # Registry proxy — project guidelines
@@ -11,10 +6,10 @@ This repository implements a Cloudflare Worker proxy for registry assets.
 
 ## Before Coding (Required)
 
-1. Read [../../docs/AI_GUIDELINES.md](../../docs/AI_GUIDELINES.md).
-2. Read [../../docs/CLI_WORKFLOW.md](../../docs/CLI_WORKFLOW.md).
-3. Read [../../docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md).
-4. Read [../../.github/CONTRIBUTING.md](../../.github/CONTRIBUTING.md).
+1. Read [docs/AI_GUIDELINES.md](docs/AI_GUIDELINES.md).
+2. Read [docs/CLI_WORKFLOW.md](docs/CLI_WORKFLOW.md).
+3. Read [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+4. Read [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md).
 5. Use an issue form under `.github/ISSUE_TEMPLATE/` before implementation.
 6. Confirm no secret values are introduced into tracked files.
 

@@ -1,5 +1,11 @@
 ignores:
   - "node_modules/**"
+  - "AGENTS.md"
+  - "CLAUDE.md"
+  - ".cursor/skills/**"
+  - ".agents/skills/**"
+  - ".claude/agents/**"
+  - ".github/agents/**"
 config:
   MD013:
     line_length: 300

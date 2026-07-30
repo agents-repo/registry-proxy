@@ -8,13 +8,18 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
 
+const GENERATED_COMMENT =
+  '<!-- Generated: .github/copilot-instructions.md. Run npm run sync:ide-instructions -->';
+const LEGACY_GENERATED_COMMENT =
+  '<!-- Generated from .github/copilot-instructions.md — do not edit; run npm run sync:cursor-rules -->';
+
 function makeTempRepo() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-cursor-sync-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-ide-sync-'));
   fs.mkdirSync(path.join(dir, '.github'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.copyFileSync(
-    path.join(REPO_ROOT, 'scripts', 'sync-cursor-rules.mjs'),
-    path.join(dir, 'scripts', 'sync-cursor-rules.mjs'),
+    path.join(REPO_ROOT, 'scripts', 'sync-ide-instructions.mjs'),
+    path.join(dir, 'scripts', 'sync-ide-instructions.mjs'),
   );
   return dir;
 }
@@ -27,8 +32,8 @@ afterEach(() => {
   }
 });
 
-describe('sync-cursor-rules', () => {
-  it('writes mirror with frontmatter and generated comment', async () => {
+describe('sync-ide-instructions', () => {
+  it('writes cursor, claude, and codex mirrors', async () => {
     const repo = makeTempRepo();
     tempRepos.push(repo);
     const source = '# Registry proxy — project guidelines\n\n## Guardrails\n';
@@ -37,18 +42,27 @@ describe('sync-cursor-rules', () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
-    const output = fs.readFileSync(
+    const cursorOutput = fs.readFileSync(
       path.join(repo, '.cursor', 'rules', 'agents-registry-proxy.mdc'),
       'utf-8',
     );
-    assert.match(output, /alwaysApply: true/);
-    assert.match(output, /Generated from \.github\/copilot-instructions\.md/);
-    assert.match(output, /# Registry proxy — project guidelines/);
+    assert.match(cursorOutput, /alwaysApply: true/);
+    assert.match(cursorOutput, /Generated: \.github\/copilot-instructions\.md/);
+    assert.match(cursorOutput, /# Registry proxy — project guidelines/);
+
+    const claudeOutput = fs.readFileSync(path.join(repo, 'CLAUDE.md'), 'utf-8');
+    assert.match(claudeOutput, /Generated: \.github\/copilot-instructions\.md/);
+    assert.match(claudeOutput, /# Registry proxy — project guidelines/);
+    assert.doesNotMatch(claudeOutput, /alwaysApply: true/);
+
+    const codexOutput = fs.readFileSync(path.join(repo, 'AGENTS.md'), 'utf-8');
+    assert.match(codexOutput, /Generated: \.github\/copilot-instructions\.md/);
+    assert.match(codexOutput, /# Registry proxy — project guidelines/);
   });
 
-  it('rewrites relative markdown links for the mirror directory depth', async () => {
+  it('rewrites relative markdown links for the cursor mirror directory depth', async () => {
     const repo = makeTempRepo();
     tempRepos.push(repo);
     const source = [
@@ -64,7 +78,7 @@ describe('sync-cursor-rules', () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
     const output = fs.readFileSync(
       path.join(repo, '.cursor', 'rules', 'agents-registry-proxy.mdc'),
@@ -84,6 +98,10 @@ describe('sync-cursor-rules', () => {
     );
     assert.doesNotMatch(output, /\]\(\.\.\/docs\/AI_GUIDELINES\.md\)/);
     assert.doesNotMatch(output, /\]\(CONTRIBUTING\.md\)/);
+
+    const claudeOutput = fs.readFileSync(path.join(repo, 'CLAUDE.md'), 'utf-8');
+    assert.match(claudeOutput, /\[docs\/AI_GUIDELINES\.md\]\(docs\/AI_GUIDELINES\.md\)/);
+    assert.match(claudeOutput, /\[\.github\/CONTRIBUTING\.md\]\(\.github\/CONTRIBUTING\.md\)/);
   });
 
   it('removes stale generated sibling rules on sync', async () => {
@@ -98,18 +116,45 @@ describe('sync-cursor-rules', () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
     const rulesDir = path.join(repo, '.cursor', 'rules');
     fs.writeFileSync(
       path.join(rulesDir, 'old-generated.mdc'),
-      '<!-- Generated from .github/copilot-instructions.md — do not edit; run npm run sync:cursor-rules -->\nstale\n',
+      `${GENERATED_COMMENT}\nstale\n`,
       'utf-8',
     );
 
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
     assert.equal(fs.existsSync(path.join(rulesDir, 'old-generated.mdc')), false);
+    assert.equal(fs.existsSync(path.join(rulesDir, 'agents-registry-proxy.mdc')), true);
+  });
+
+  it('removes legacy sync-cursor-rules sibling rules on sync', async () => {
+    const repo = makeTempRepo();
+    tempRepos.push(repo);
+    fs.writeFileSync(
+      path.join(repo, '.github', 'copilot-instructions.md'),
+      '# Source\n',
+      'utf-8',
+    );
+
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
+
+    const rulesDir = path.join(repo, '.cursor', 'rules');
+    fs.writeFileSync(
+      path.join(rulesDir, 'legacy-generated.mdc'),
+      `${LEGACY_GENERATED_COMMENT}\nstale\n`,
+      'utf-8',
+    );
+
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
+
+    assert.equal(fs.existsSync(path.join(rulesDir, 'legacy-generated.mdc')), false);
     assert.equal(fs.existsSync(path.join(rulesDir, 'agents-registry-proxy.mdc')), true);
   });
 
@@ -125,16 +170,16 @@ describe('sync-cursor-rules', () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
     fs.writeFileSync(
       path.join(repo, '.cursor', 'rules', 'old-generated.mdc'),
-      '<!-- Generated from .github/copilot-instructions.md — do not edit; run npm run sync:cursor-rules -->\nstale\n',
+      `${GENERATED_COMMENT}\nstale\n`,
       'utf-8',
     );
 
     await assert.rejects(
-      () => execFileAsync('node', ['scripts/sync-cursor-rules.mjs', '--check'], { cwd: repo }),
+      () => execFileAsync('node', ['scripts/sync-ide-instructions.mjs', '--check'], { cwd: repo }),
       (error) => error.code === 1,
     );
   });
@@ -148,7 +193,7 @@ describe('sync-cursor-rules', () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
     const output = fs.readFileSync(
       path.join(repo, '.cursor', 'rules', 'agents-registry-proxy.mdc'),
@@ -176,7 +221,7 @@ describe('sync-cursor-rules', () => {
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
     await assert.rejects(
-      () => execFileAsync('node', ['scripts/sync-cursor-rules.mjs', '--check'], { cwd: repo }),
+      () => execFileAsync('node', ['scripts/sync-ide-instructions.mjs', '--check'], { cwd: repo }),
       (error) => error.code === 1,
     );
   });
@@ -193,7 +238,7 @@ describe('sync-cursor-rules', () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
     fs.writeFileSync(
       path.join(repo, '.cursor', 'rules', 'custom-rule.mdc'),
@@ -201,7 +246,7 @@ describe('sync-cursor-rules', () => {
       'utf-8',
     );
 
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs', '--check'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs', '--check'], { cwd: repo });
   });
 
   it('treats CRLF mirror content as in sync when logically identical', async () => {
@@ -216,12 +261,14 @@ describe('sync-cursor-rules', () => {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
     const execFileAsync = promisify(execFile);
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs'], { cwd: repo });
+    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs'], { cwd: repo });
 
-    const mirrorPath = path.join(repo, '.cursor', 'rules', 'agents-registry-proxy.mdc');
+    const mirrorPath = path.join(repo, 'CLAUDE.md');
     const content = fs.readFileSync(mirrorPath, 'utf-8');
     fs.writeFileSync(mirrorPath, content.replace(/\n/g, '\r\n'), 'utf-8');
 
-    await execFileAsync('node', ['scripts/sync-cursor-rules.mjs', '--check'], { cwd: repo });
+    await assert.doesNotReject(
+      execFileAsync('node', ['scripts/sync-ide-instructions.mjs', '--check'], { cwd: repo }),
+    );
   });
 });
