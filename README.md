@@ -156,6 +156,7 @@ Example:
 
 ## Project Docs
 
+- [Ecosystem overview](https://github.com/agents-repo/.github/blob/main/docs/ecosystem.md) (organization platform map)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
 - [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
