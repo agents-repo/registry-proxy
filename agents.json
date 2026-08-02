@@ -5,8 +5,8 @@
     "ref": "v2.x"
   },
   "packages": {
-    "maiconfz/github-pr-review-triage": "^1.1.0",
-    "maiconfz/github-interactive-issue-implementation-planner": "^1.1.1"
+    "maiconfz/github-interactive-issue-implementation-planner": "^1.1.1",
+    "maiconfz/github-pr-review-triage": "^1.1.1"
   },
   "targets": [
     "github-copilot",
