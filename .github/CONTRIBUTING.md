@@ -96,7 +96,8 @@ Bootstrap only when `agents.json` is missing:
 npx agents-repo@1.13.0 init --targets github-copilot claude-code cursor openai-codex
 ```
 
-Use the pinned npm scripts (same CLI version as CI):
+Use the pinned npm scripts for local bulk install and update (pinned CLI
+release; pr-baseline CI uses `agents-repo@latest` for lock-pinned `ci` only):
 
 ```bash
 npm run agents:install   # bulk sync from agents.json
@@ -104,6 +105,8 @@ npm run agents:update    # refresh within semver ranges
 ```
 
 Commit `agents.json`, `agents-lock.json`, and extracted paths (`.github/agents/`, `.cursor/skills/`, `.claude/agents/`, `.agents/skills/`). Do not hand-edit extracted package files.
+
+PR baseline runs `npx agents-repo@latest ci` to reinstall from the committed lock and fail on extract drift (registry package versions stay lock-pinned; only the CLI runner tracks npm `@latest` per [agents-repo/.github#32](https://github.com/agents-repo/.github/issues/32)).
 
 ## Branch Naming
 
