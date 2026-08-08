@@ -3,7 +3,13 @@ import globals from "globals";
 
 export default [
   {
-    ignores: ["node_modules/**", ".git/**", "coverage/**"],
+    ignores: [
+      "node_modules/**",
+      ".git/**",
+      "coverage/**",
+      // Synced org-wide; sonar/security rules apply in repos that ship those plugins.
+      "scripts/lint-workflows.mjs",
+    ],
   },
   {
     files: [
