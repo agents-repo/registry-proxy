@@ -47,7 +47,7 @@ For each task, provide:
 Required command baseline:
 
 - `npm run env:check`
-- `npm run lint:all`
+- `npm run lint:all` (includes `lint:workflows` / actionlint on `.github/workflows/`)
 - `npm run check:secrets`
 - `npm run test`
 
