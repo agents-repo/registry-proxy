@@ -7,8 +7,6 @@ export default [
       "node_modules/**",
       ".git/**",
       "coverage/**",
-      // Synced org-wide; sonar/security rules apply in repos that ship those plugins.
-      "scripts/lint-workflows.mjs",
     ],
   },
   {
