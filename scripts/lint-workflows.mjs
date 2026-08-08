@@ -17,6 +17,50 @@ const WORKFLOWS_DIR = path.join(REPO_ROOT, '.github', 'workflows');
 const CACHE_ROOT = path.join(REPO_ROOT, '.cache', 'actionlint');
 const BOOTSTRAP_LOCK_FILE = path.join(CACHE_ROOT, '.bootstrap.lock');
 
+/** Standard OS binary locations — avoids relying on a user-writable PATH. */
+const TRUSTED_PATH_DIRS =
+  process.platform === 'win32'
+    ? ['C:\\Windows\\System32', 'C:\\Windows']
+    : ['/usr/local/sbin', '/usr/local/bin', '/usr/sbin', '/usr/bin', '/sbin', '/bin'];
+
+function trustedPathValue() {
+  return TRUSTED_PATH_DIRS.join(process.platform === 'win32' ? ';' : ':');
+}
+
+function trustedEnv() {
+  return { ...process.env, PATH: trustedPathValue() };
+}
+
+function resolveTrustedExecutable(commandName) {
+  const fileName =
+    process.platform === 'win32' && !commandName.toLowerCase().endsWith('.exe')
+      ? `${commandName}.exe`
+      : commandName;
+  for (const directory of TRUSTED_PATH_DIRS) {
+    const candidate = path.join(directory, fileName);
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  throw new Error(
+    `Required executable "${commandName}" was not found under trusted system directories.`,
+  );
+}
+
+function execTrusted(commandName, args, options = {}) {
+  const executable = resolveTrustedExecutable(commandName);
+  return execFileSync(executable, args, { ...options, env: trustedEnv() });
+}
+
+function parseSemverToken(stdout) {
+  for (const token of stdout.split(/\s+/)) {
+    if (/^\d{1,20}\.\d{1,20}\.\d{1,20}$/.test(token)) {
+      return token;
+    }
+  }
+  return null;
+}
+
 function sleepSync(ms) {
   const view = new Int32Array(new SharedArrayBuffer(4));
   Atomics.wait(view, 0, 0, ms);
@@ -44,12 +88,11 @@ function removeStaleBootstrapLockIfNeeded() {
 
 function readPathActionlintVersion() {
   try {
-    const output = execFileSync('actionlint', ['-version'], {
+    const output = execTrusted('actionlint', ['-version'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     }).trim();
-    const match = output.match(/(\d+\.\d+\.\d+)/);
-    return match?.[1] ?? null;
+    return parseSemverToken(output);
   } catch {
     return null;
   }
@@ -81,7 +124,7 @@ function expectedArchiveSha256(asset) {
   const checksumsUrl = `https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_checksums.txt`;
   let checksumsBody;
   try {
-    checksumsBody = execFileSync('curl', ['-fsSL', checksumsUrl], { encoding: 'utf8' });
+    checksumsBody = execTrusted('curl', ['-fsSL', checksumsUrl], { encoding: 'utf8' });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to download actionlint checksums (requires curl). ${detail}`, {
@@ -120,7 +163,7 @@ function bootstrapFromRelease() {
   const url = `https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${asset}`;
 
   try {
-    execFileSync('curl', ['-fsSL', '-o', archivePath, url], { stdio: 'inherit' });
+    execTrusted('curl', ['-fsSL', '-o', archivePath, url], { stdio: 'inherit' });
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to download actionlint (requires curl). ${detail}`, { cause: error });
@@ -132,9 +175,9 @@ function bootstrapFromRelease() {
   try {
     try {
       if (asset.endsWith('.tar.gz')) {
-        execFileSync('tar', ['-xzf', archivePath, '-C', stagingDir], { stdio: 'inherit' });
+        execTrusted('tar', ['-xzf', archivePath, '-C', stagingDir], { stdio: 'inherit' });
       } else if (asset.endsWith('.zip')) {
-        execFileSync('unzip', ['-o', archivePath, '-d', stagingDir], { stdio: 'inherit' });
+        execTrusted('unzip', ['-o', archivePath, '-d', stagingDir], { stdio: 'inherit' });
       } else {
         throw new Error(`Unknown archive type: ${asset}`);
       }
@@ -244,7 +287,7 @@ function resolveActionlintBinary() {
     if (pathVersion === ACTIONLINT_VERSION) {
       const detail = error instanceof Error ? error.message : String(error);
       console.warn(`actionlint bootstrap failed; using actionlint from PATH. ${detail}`);
-      return 'actionlint';
+      return resolveTrustedExecutable('actionlint');
     }
     throw error;
   }
@@ -275,10 +318,11 @@ function main() {
 
   const binary = resolveActionlintBinary();
   const workflowFiles = listWorkflowFiles();
-  const result = spawnSync(binary, workflowFiles, {
+  const executable = path.isAbsolute(binary) ? binary : resolveTrustedExecutable(binary);
+  const result = spawnSync(executable, ['-color', ...workflowFiles], {
     cwd: REPO_ROOT,
     stdio: 'inherit',
-    env: { ...process.env },
+    env: trustedEnv(),
   });
 
   if (result.error) {
