@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 /** Pinned actionlint release — keep in sync across agents-repo org repositories. */
 const ACTIONLINT_VERSION = '1.7.12';
 const BOOTSTRAP_LOCK_WAIT_MS = 120_000;
+/** Stale lock removal must exceed max bootstrap wait so active installs are not interrupted. */
+const BOOTSTRAP_LOCK_STALE_MS = 600_000;
 const BOOTSTRAP_LOCK_POLL_MS = 200;
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,7 +34,7 @@ function removeStaleBootstrapLockIfNeeded() {
   }
   try {
     const { mtimeMs } = fs.statSync(BOOTSTRAP_LOCK_FILE);
-    if (Date.now() - mtimeMs > BOOTSTRAP_LOCK_WAIT_MS) {
+    if (Date.now() - mtimeMs > BOOTSTRAP_LOCK_STALE_MS) {
       fs.unlinkSync(BOOTSTRAP_LOCK_FILE);
     }
   } catch {
@@ -273,7 +275,7 @@ function main() {
 
   const binary = resolveActionlintBinary();
   const workflowFiles = listWorkflowFiles();
-  const result = spawnSync(binary, ['-color', ...workflowFiles], {
+  const result = spawnSync(binary, workflowFiles, {
     cwd: REPO_ROOT,
     stdio: 'inherit',
     env: { ...process.env },
