@@ -1,3 +1,5 @@
+import { resolvePkgProxyTarget } from "./pkg-routes.js";
+
 const REPO_OWNER = "agents-repo";
 const REPO_NAME = "registry";
 const RAW_BASE_URL = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}`;
@@ -88,6 +90,7 @@ function usagePayload() {
     supported_formats: [
       "/<ref>/<path>",
       "/<path>?ref=<ref>",
+      "/pkg/<namespace>/<package-id>/...?ref=<ref>[&version=<semver>]",
       "/tags",
     ],
     examples: [
@@ -98,6 +101,8 @@ function usagePayload() {
       "/packages/index.json?ref=release-2026-06",
       "/packages/index.json?ref=v1.0.0",
       "/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f",
+      "/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0",
+      "/pkg/agents-repo/hello-agent/1.0.0/instructions.json?ref=v2.x",
       "/tags",
     ],
   };
@@ -107,10 +112,14 @@ function usageResponse() {
   return jsonResponse(usagePayload(), 200);
 }
 
+function pkgErrorResponse(payload, status = 400) {
+  return jsonResponse(payload, status);
+}
+
 function missingRefResponse() {
   return jsonResponse({
     error: "missing_ref",
-    message: "A ref is required. Use /<ref>/<path> or /<path>?ref=<ref>.",
+    message: "A ref is required. Use /<ref>/<path>, /<path>?ref=<ref>, or /pkg/...?ref=<ref>.",
     repository: `${REPO_OWNER}/${REPO_NAME}`,
     supported_formats: usagePayload().supported_formats,
     examples: usagePayload().examples,
@@ -453,6 +462,12 @@ function buildUpstreamRequest(target, env, requestHeaders) {
 }
 
 export {
+  buildCanonicalPackagePath,
+  parsePkgPath,
+  resolvePkgProxyTarget,
+} from "./pkg-routes.js";
+
+export {
   buildContentsApiUrl,
   buildTagsApiUrl,
   buildTagsCacheKey,
@@ -515,6 +530,79 @@ async function handleTagsRoute(env, ctx) {
   return withTagsClientResponse(cacheResponse);
 }
 
+function isMarkdownTargetPath(targetPath) {
+  return targetPath.endsWith(".md") || targetPath.endsWith(".agent.md");
+}
+
+function shouldApplyMarkdownContentType(contentType) {
+  if (!contentType) {
+    return true;
+  }
+
+  const normalized = contentType.toLowerCase().split(";")[0].trim();
+  return normalized === "text/plain";
+}
+
+function withMarkdownContentTypeIfNeeded(response, targetPath) {
+  if (response.status !== 200 || !isMarkdownTargetPath(targetPath)) {
+    return response;
+  }
+
+  const contentType = response.headers.get("content-type");
+  if (!shouldApplyMarkdownContentType(contentType)) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  headers.set("content-type", "text/markdown; charset=utf-8");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+async function fetchManifestLatest(ref, manifestPath, env, requestHeaders) {
+  const target = { ref, targetPath: manifestPath };
+  const upstreamRequest = buildUpstreamRequest(target, env, requestHeaders);
+
+  let upstreamResponse;
+  try {
+    upstreamResponse = await fetch(upstreamRequest.url, {
+      method: "GET",
+      headers: upstreamRequest.headers,
+    });
+  } catch {
+    return { ok: false };
+  }
+
+  if (!upstreamResponse.ok) {
+    return { ok: false, status: upstreamResponse.status };
+  }
+
+  let payload;
+  try {
+    payload = await upstreamResponse.json();
+  } catch {
+    return { ok: false };
+  }
+
+  const latest = payload?.latest;
+  if (typeof latest !== "string" || !latest.trim()) {
+    return { ok: false };
+  }
+
+  return { ok: true, latest: latest.trim() };
+}
+
+async function resolvePkgRouteTarget(requestUrl, env, requestHeaders) {
+  return resolvePkgProxyTarget(requestUrl, {
+    normalizePath,
+    normalizeRef,
+    fetchManifestLatest: (ref, manifestPath) => fetchManifestLatest(ref, manifestPath, env, requestHeaders),
+  });
+}
+
 async function handleProxyRoute(target, env, request, ctx) {
   const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
   const upstreamUrl = upstreamRequest.url;
@@ -545,11 +633,16 @@ async function handleProxyRoute(target, env, request, ctx) {
   }
 
   const responseHeaders = new Headers(upstreamResponse.headers);
-  const response = new Response(upstreamResponse.body, {
+  let response = new Response(upstreamResponse.body, {
     status: upstreamResponse.status,
     statusText: upstreamResponse.statusText,
     headers: responseHeaders,
   });
+
+  if (target.fromPkgRoute) {
+    response = withMarkdownContentTypeIfNeeded(response, target.targetPath);
+  }
+
   const responseWithCors = withCors(response);
 
   if (upstreamResponse.status === 200) {
@@ -561,6 +654,38 @@ async function handleProxyRoute(target, env, request, ctx) {
 
 async function handleWorkerGet(request, env, ctx) {
   const requestUrl = new URL(request.url);
+  const normalizedPath = normalizePath(requestUrl.pathname);
+  if (normalizedPath !== null && (normalizedPath === "pkg" || normalizedPath.startsWith("pkg/"))) {
+    const pkgTarget = await resolvePkgRouteTarget(requestUrl, env, request.headers);
+
+    if (pkgTarget === null) {
+      return pkgErrorResponse({
+        error: "invalid_pkg_path",
+        message: "Unsupported /pkg/ path shape.",
+      }, 400);
+    }
+
+    if (pkgTarget.kind === "missing_ref") {
+      return missingRefResponse();
+    }
+
+    if (pkgTarget.kind === "invalid_path") {
+      return invalidPathResponse();
+    }
+
+    if (pkgTarget.kind === "pkg_error") {
+      return pkgErrorResponse(pkgTarget.payload, pkgTarget.status ?? 400);
+    }
+
+    if (pkgTarget.kind === "proxy" && isLegacyFlatPackagePath(pkgTarget.targetPath)) {
+      return legacyFlatPathResponse();
+    }
+
+    if (pkgTarget.kind === "proxy") {
+      return handleProxyRoute(pkgTarget, env, request, ctx);
+    }
+  }
+
   const target = getProxyTarget(requestUrl);
 
   if (target.kind === "usage") {

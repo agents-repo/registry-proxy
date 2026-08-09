@@ -39,6 +39,19 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
   TTL check.
 - Path-style routes such as `/main/tags` remain file proxy requests, not tag listing
 
+## Pkg alias routes
+
+- Incoming paths MUST start with `/pkg/` and use query `ref` only (no `/<ref>/pkg/...` in MVP).
+- Two supported families:
+  - Version in path: `/pkg/<namespace>/<package-id>/<version>/agents|flows|instructions.json`
+  - Short alias: `/pkg/<namespace>/<package-id>/agents|flows/<id>` or `.../instructions.json`
+- Short aliases accept optional `?version=<semver>`; when omitted, the worker fetches
+  `packages/<namespace>/<package-id>/versions/manifest.json` at `ref` and uses `latest`.
+- Rewritten upstream target:
+  `packages/<namespace>/<package-id>/versions/<version>/...` (immutable version snapshot).
+- Markdown responses from `/pkg/` routes MAY receive `Content-Type: text/markdown; charset=utf-8`
+  when upstream omits a content type.
+
 ## Method Policy
 
 - Supported: `GET`
