@@ -116,6 +116,31 @@ Examples:
 - Commit SHA:
   - `https://<worker>.workers.dev/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f`
 
+## `/pkg/` chat instruction aliases
+
+Chat-web consumers use shorter `/pkg/` paths that always resolve to immutable
+version snapshots under `packages/<namespace>/<package-id>/versions/<version>/...`.
+For `/pkg/` routes, `ref` MUST be supplied as a query parameter (`?ref=<ref>`);
+path-style `/<ref>/pkg/...` is not supported.
+
+Supported shapes:
+
+- Version in path (matches `instructions.json` path fields):
+  - `/pkg/<namespace>/<package-id>/<version>/agents/<agent-id>.agent.md?ref=<ref>`
+  - `/pkg/<namespace>/<package-id>/<version>/flows/<flow-id>.agent.md?ref=<ref>`
+  - `/pkg/<namespace>/<package-id>/<version>/instructions.json?ref=<ref>`
+- Short alias (optional `version` query; otherwise `latest` from `versions/manifest.json`):
+  - `/pkg/<namespace>/<package-id>/agents/<agent-id>?ref=<ref>[&version=<semver>]`
+  - `/pkg/<namespace>/<package-id>/flows/<flow-id>?ref=<ref>[&version=<semver>]`
+  - `/pkg/<namespace>/<package-id>/instructions.json?ref=<ref>[&version=<semver>]`
+
+Canonical proxy equivalent for the same flow instruction (pinned `1.0.0` at ref `v2.x`):
+
+- Alias:
+  - `https://<worker>.workers.dev/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0`
+- Canonical:
+  - `https://<worker>.workers.dev/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/flows/hello-agents.agent.md`
+
 ## Tags listing
 
 `GET /tags` returns all release tag names for `agents-repo/registry` as a JSON array in GitHub API shape: `[{ "name": "v1.2.0" }, ...]`.

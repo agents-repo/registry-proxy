@@ -861,3 +861,112 @@ test("fetch updates edge cache when conditional request receives fresh upstream 
     globalThis.fetch = originalFetch;
   }
 });
+
+test("fetch proxies /pkg short alias with version query to canonical upstream path", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    const fetchedUrls = [];
+    globalThis.fetch = async (url) => {
+      fetchedUrls.push(String(url));
+
+      if (String(url).includes("manifest.json")) {
+        return new Response(JSON.stringify({ latest: "1.0.0" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response("# Hello", {
+        status: 200,
+        headers: {},
+      });
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0"),
+      {},
+      { waitUntil() {} },
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "# Hello");
+    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.equal(fetchedUrls.length, 1);
+    assert.match(
+      fetchedUrls[0],
+      /agents-repo\/registry\/v2\.x\/packages\/agents-repo\/hello-agent\/versions\/1\.0\.0\/flows\/hello-agents\.agent\.md$/,
+    );
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch returns missing_ref for /pkg routes without ref query", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/pkg/agents-repo/hello-agent/instructions.json"),
+    {},
+    { waitUntil() {} },
+  );
+
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.equal(payload.error, "missing_ref");
+});
+
+test("fetch applies markdown content-type on cached /pkg upstream responses", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const upstreamUrl = "https://raw.githubusercontent.com/agents-repo/registry/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/flows/hello-agents.agent.md";
+
+  try {
+    const cacheStore = new Map();
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async (url) => {
+      if (String(url) === upstreamUrl) {
+        return new Response("# Cached", {
+          status: 200,
+          headers: { "content-type": "text/plain;charset=UTF-8" },
+        });
+      }
+
+      throw new Error(`unexpected fetch: ${url}`);
+    };
+
+    const pkgRequest = new Request(
+      "https://worker.example/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0",
+    );
+
+    const firstResponse = await worker.fetch(pkgRequest, {}, { waitUntil() {} });
+    assert.equal(firstResponse.status, 200);
+    assert.equal(firstResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+
+    const secondResponse = await worker.fetch(pkgRequest, {}, { waitUntil() {} });
+    assert.equal(secondResponse.status, 200);
+    assert.equal(secondResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
