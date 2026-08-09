@@ -161,8 +161,28 @@ function containsPathTraversal(pathValue) {
   return decodePathValue(currentValue) !== currentValue;
 }
 
+function trimLeadingSlashes(value) {
+  let index = 0;
+  while (index < value.length && value[index] === "/") {
+    index += 1;
+  }
+  return value.slice(index);
+}
+
+function trimSlashEdges(value) {
+  let start = 0;
+  let end = value.length;
+  while (start < end && value[start] === "/") {
+    start += 1;
+  }
+  while (end > start && value[end - 1] === "/") {
+    end -= 1;
+  }
+  return value.slice(start, end);
+}
+
 function normalizePath(pathname) {
-  const normalizedPath = (pathname || "/").replace(/^\/+/, "");
+  const normalizedPath = trimLeadingSlashes(pathname || "/");
   if (!normalizedPath) {
     return "";
   }
@@ -175,7 +195,7 @@ function normalizePath(pathname) {
 }
 
 function normalizeRef(refValue) {
-  const normalizedRef = String(refValue || "").replace(/^\/+|\/+$/g, "");
+  const normalizedRef = trimSlashEdges(String(refValue || ""));
   if (!normalizedRef) {
     return null;
   }
@@ -272,12 +292,12 @@ function encodeRef(ref) {
 }
 
 function buildUpstreamUrl(ref, targetPath) {
-  const normalizedPath = targetPath.replace(/^\/+/, "");
+  const normalizedPath = trimLeadingSlashes(targetPath);
   return `${RAW_BASE_URL}/${encodeRef(ref)}/${normalizedPath}`;
 }
 
 function buildContentsApiUrl(ref, targetPath) {
-  const normalizedPath = targetPath.replace(/^\/+/, "");
+  const normalizedPath = trimLeadingSlashes(targetPath);
   return `${CONTENTS_API_BASE_URL}/${normalizedPath}?ref=${encodeURIComponent(ref)}`;
 }
 
@@ -453,6 +473,119 @@ export {
   UPSTREAM_USER_AGENT,
 };
 
+async function handleTagsRoute(env, ctx) {
+  const cache = caches.default;
+  const cacheKey = buildTagsCacheKey();
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const cachedAtMs = getTagsCachedAtMs(cached);
+    if (cachedAtMs !== null && isTagsEdgeCacheFresh(cachedAtMs)) {
+      return withTagsClientResponse(cached);
+    }
+  }
+
+  let tagsResult;
+  try {
+    tagsResult = await fetchAllRepositoryTags(env);
+  } catch {
+    if (cached) {
+      return withTagsClientResponse(cached);
+    }
+
+    return withCors(new Response("Bad Gateway", { status: 502 }));
+  }
+
+  if (!tagsResult.ok) {
+    if (cached) {
+      return withTagsClientResponse(cached);
+    }
+
+    const response = new Response(tagsResult.body, {
+      status: tagsResult.status,
+      statusText: tagsResult.statusText,
+      headers: new Headers({
+        "content-type": "application/json; charset=utf-8",
+      }),
+    });
+    return withCors(response);
+  }
+
+  const cacheResponse = buildTagsCacheResponse(tagsResult.tags);
+  ctx.waitUntil(cache.put(cacheKey, cacheResponse.clone()));
+  return withTagsClientResponse(cacheResponse);
+}
+
+async function handleProxyRoute(target, env, request, ctx) {
+  const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
+  const upstreamUrl = upstreamRequest.url;
+  const hasConditionalHeaders = requestHasConditionalHeaders(request.headers);
+
+  const cache = caches.default;
+  const cacheKey = new Request(upstreamUrl, { method: "GET" });
+  if (!hasConditionalHeaders) {
+    const cached = await cache.match(cacheKey);
+    if (cached) {
+      return withCors(cached);
+    }
+  }
+
+  const upstreamFetchOptions = {
+    method: "GET",
+    headers: upstreamRequest.headers,
+  };
+  if (!hasConditionalHeaders) {
+    upstreamFetchOptions.cf = { cacheEverything: true };
+  }
+
+  let upstreamResponse;
+  try {
+    upstreamResponse = await fetch(upstreamUrl, upstreamFetchOptions);
+  } catch {
+    return withCors(new Response("Bad Gateway", { status: 502 }));
+  }
+
+  const responseHeaders = new Headers(upstreamResponse.headers);
+  const response = new Response(upstreamResponse.body, {
+    status: upstreamResponse.status,
+    statusText: upstreamResponse.statusText,
+    headers: responseHeaders,
+  });
+  const responseWithCors = withCors(response);
+
+  if (upstreamResponse.status === 200) {
+    ctx.waitUntil(cache.put(cacheKey, responseWithCors.clone()));
+  }
+
+  return responseWithCors;
+}
+
+async function handleWorkerGet(request, env, ctx) {
+  const requestUrl = new URL(request.url);
+  const target = getProxyTarget(requestUrl);
+
+  if (target.kind === "usage") {
+    return usageResponse();
+  }
+
+  if (target.kind === "missing_ref") {
+    return missingRefResponse();
+  }
+
+  if (target.kind === "invalid_path") {
+    return invalidPathResponse();
+  }
+
+  if (target.kind === "proxy" && isLegacyFlatPackagePath(target.targetPath)) {
+    return legacyFlatPathResponse();
+  }
+
+  if (target.kind === "tags") {
+    return handleTagsRoute(env, ctx);
+  }
+
+  return handleProxyRoute(target, env, request, ctx);
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method === "OPTIONS") {
@@ -466,107 +599,6 @@ export default {
       }));
     }
 
-    const requestUrl = new URL(request.url);
-    const target = getProxyTarget(requestUrl);
-
-    if (target.kind === "usage") {
-      return usageResponse();
-    }
-
-    if (target.kind === "missing_ref") {
-      return missingRefResponse();
-    }
-
-    if (target.kind === "invalid_path") {
-      return invalidPathResponse();
-    }
-
-    if (target.kind === "proxy" && isLegacyFlatPackagePath(target.targetPath)) {
-      return legacyFlatPathResponse();
-    }
-
-    if (target.kind === "tags") {
-      const cache = caches.default;
-      const cacheKey = buildTagsCacheKey();
-      const cached = await cache.match(cacheKey);
-      if (cached) {
-        const cachedAtMs = getTagsCachedAtMs(cached);
-        if (cachedAtMs !== null && isTagsEdgeCacheFresh(cachedAtMs)) {
-          return withTagsClientResponse(cached);
-        }
-      }
-
-      let tagsResult;
-      try {
-        tagsResult = await fetchAllRepositoryTags(env);
-      } catch {
-        if (cached) {
-          return withTagsClientResponse(cached);
-        }
-
-        return withCors(new Response("Bad Gateway", { status: 502 }));
-      }
-
-      if (!tagsResult.ok) {
-        if (cached) {
-          return withTagsClientResponse(cached);
-        }
-
-        const response = new Response(tagsResult.body, {
-          status: tagsResult.status,
-          statusText: tagsResult.statusText,
-          headers: new Headers({
-            "content-type": "application/json; charset=utf-8",
-          }),
-        });
-        return withCors(response);
-      }
-
-      const cacheResponse = buildTagsCacheResponse(tagsResult.tags);
-      ctx.waitUntil(cache.put(cacheKey, cacheResponse.clone()));
-      return withTagsClientResponse(cacheResponse);
-    }
-
-    const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
-    const upstreamUrl = upstreamRequest.url;
-    const hasConditionalHeaders = requestHasConditionalHeaders(request.headers);
-
-    const cache = caches.default;
-    const cacheKey = new Request(upstreamUrl, { method: "GET" });
-    if (!hasConditionalHeaders) {
-      const cached = await cache.match(cacheKey);
-      if (cached) {
-        return withCors(cached);
-      }
-    }
-
-    const upstreamFetchOptions = {
-      method: "GET",
-      headers: upstreamRequest.headers,
-    };
-    if (!hasConditionalHeaders) {
-      upstreamFetchOptions.cf = { cacheEverything: true };
-    }
-
-    let upstreamResponse;
-    try {
-      upstreamResponse = await fetch(upstreamUrl, upstreamFetchOptions);
-    } catch {
-      return withCors(new Response("Bad Gateway", { status: 502 }));
-    }
-
-    const responseHeaders = new Headers(upstreamResponse.headers);
-    const response = new Response(upstreamResponse.body, {
-      status: upstreamResponse.status,
-      statusText: upstreamResponse.statusText,
-      headers: responseHeaders,
-    });
-    const responseWithCors = withCors(response);
-
-    if (upstreamResponse.status === 200) {
-      ctx.waitUntil(cache.put(cacheKey, responseWithCors.clone()));
-    }
-
-    return responseWithCors;
+    return handleWorkerGet(request, env, ctx);
   },
 };

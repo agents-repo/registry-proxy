@@ -246,7 +246,9 @@ describe('sync-ide-instructions', () => {
       'utf-8',
     );
 
-    await execFileAsync('node', ['scripts/sync-ide-instructions.mjs', '--check'], { cwd: repo });
+    await assert.doesNotReject(
+      execFileAsync('node', ['scripts/sync-ide-instructions.mjs', '--check'], { cwd: repo }),
+    );
   });
 
   it('treats CRLF mirror content as in sync when logically identical', async () => {

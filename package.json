@@ -18,6 +18,7 @@
     "test:sync": "node --test test/sync-ide-instructions.test.mjs",
     "check:secrets": "bash scripts/check-secrets.sh",
     "test": "npm run test:sync && node --test 'test/**/*.test.js'",
+    "release": "semantic-release",
     "release:dry-run": "semantic-release --dry-run",
     "prepare": "husky"
   },
