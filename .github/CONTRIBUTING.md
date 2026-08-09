@@ -90,23 +90,26 @@ Install and refresh catalog packages with the [agents-repo CLI](https://github.c
 `agents.json` points at `https://registry-proxy.maiconfz.workers.dev` (organization
 catalog proxy).
 
-Bootstrap only when `agents.json` is missing:
+Bootstrap only when `agents.json` is missing (one-time; use a published CLI
+release or `npm exec agents-repo -- init` after `npm ci`):
 
 ```bash
-npx agents-repo@1.13.0 init --targets github-copilot claude-code cursor openai-codex
+npm exec agents-repo -- init --targets github-copilot claude-code cursor openai-codex
 ```
 
-Use the pinned npm scripts for local bulk install and update (pinned CLI
-release; pr-baseline CI uses `agents-repo@latest` for lock-pinned `ci` only):
+Use the npm scripts for bulk install, update, and CI (CLI version is pinned in
+`package.json` / `package-lock.json`, distinct from registry packages in
+`agents-lock.json`):
 
 ```bash
 npm run agents:install   # bulk sync from agents.json
 npm run agents:update    # refresh within semver ranges
+npm run agents:ci        # same command pr-baseline uses after npm ci
 ```
 
 Commit `agents.json`, `agents-lock.json`, and extracted paths (`.github/agents/`, `.cursor/skills/`, `.claude/agents/`, `.agents/skills/`). Do not hand-edit extracted package files.
 
-PR baseline runs `npx agents-repo@latest ci` to reinstall from the committed lock and fail on extract drift (registry package versions stay lock-pinned; only the CLI runner tracks npm `@latest` per [agents-repo/.github#32](https://github.com/agents-repo/.github/issues/32)).
+PR baseline runs `npm run agents:ci` to reinstall from the committed registry lock and fail on extract drift ([agents-repo/.github#32](https://github.com/agents-repo/.github/issues/32), [agents-repo/.github#34](https://github.com/agents-repo/.github/issues/34)).
 
 ## Branch Naming
 
