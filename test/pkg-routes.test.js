@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildCanonicalPackagePath,
+  isSafePackageVersion,
   parsePkgPath,
   resolvePkgProxyTarget,
 } from "../src/pkg-routes.js";
@@ -184,4 +185,32 @@ test("resolvePkgProxyTarget surfaces manifest_unavailable", async () => {
   assert.equal(target.kind, "pkg_error");
   assert.equal(target.status, 404);
   assert.equal(target.payload.error, "manifest_unavailable");
+});
+
+test("resolvePkgProxyTarget rejects traversal in version query", async () => {
+  const target = await resolvePkgProxyTarget(
+    new URL("https://worker.example/pkg/agents-repo/hello-agent/flows/hello-agents?ref=main&version=1.0.0/../../other"),
+    {
+      normalizePath,
+      normalizeRef,
+      fetchManifestLatest: async () => ({ ok: true, latest: "1.0.0" }),
+    },
+  );
+
+  assert.equal(target.kind, "pkg_error");
+  assert.equal(target.payload.error, "invalid_version");
+});
+
+test("parsePkgPath rejects unsafe version segment in path", () => {
+  assert.equal(
+    parsePkgPath("pkg/agents-repo/hello-agent/1.0.0%2f..%2fother/agents/hello.agent.md"),
+    null,
+  );
+});
+
+test("isSafePackageVersion accepts semver and rejects path injection", () => {
+  assert.equal(isSafePackageVersion("1.0.0"), true);
+  assert.equal(isSafePackageVersion("1.0.1"), true);
+  assert.equal(isSafePackageVersion("1.0.0/../../other"), false);
+  assert.equal(isSafePackageVersion(""), false);
 });

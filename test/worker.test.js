@@ -924,3 +924,49 @@ test("fetch returns missing_ref for /pkg routes without ref query", async () => 
   const payload = await response.json();
   assert.equal(payload.error, "missing_ref");
 });
+
+test("fetch applies markdown content-type on cached /pkg upstream responses", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const upstreamUrl = "https://raw.githubusercontent.com/agents-repo/registry/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/flows/hello-agents.agent.md";
+
+  try {
+    const cacheStore = new Map();
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async (url) => {
+      if (String(url) === upstreamUrl) {
+        return new Response("# Cached", {
+          status: 200,
+          headers: { "content-type": "text/plain;charset=UTF-8" },
+        });
+      }
+
+      throw new Error(`unexpected fetch: ${url}`);
+    };
+
+    const pkgRequest = new Request(
+      "https://worker.example/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0",
+    );
+
+    const firstResponse = await worker.fetch(pkgRequest, {}, { waitUntil() {} });
+    assert.equal(firstResponse.status, 200);
+    assert.equal(firstResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+
+    const secondResponse = await worker.fetch(pkgRequest, {}, { waitUntil() {} });
+    assert.equal(secondResponse.status, 200);
+    assert.equal(secondResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});

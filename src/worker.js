@@ -1,4 +1,4 @@
-import { resolvePkgProxyTarget } from "./pkg-routes.js";
+import { resolvePkgProxyTarget, isSafePackageVersion } from "./pkg-routes.js";
 
 const REPO_OWNER = "agents-repo";
 const REPO_NAME = "registry";
@@ -463,6 +463,7 @@ function buildUpstreamRequest(target, env, requestHeaders) {
 
 export {
   buildCanonicalPackagePath,
+  isSafePackageVersion,
   parsePkgPath,
   resolvePkgProxyTarget,
 } from "./pkg-routes.js";
@@ -592,7 +593,12 @@ async function fetchManifestLatest(ref, manifestPath, env, requestHeaders) {
     return { ok: false };
   }
 
-  return { ok: true, latest: latest.trim() };
+  const normalizedLatest = latest.trim();
+  if (!isSafePackageVersion(normalizedLatest)) {
+    return { ok: false };
+  }
+
+  return { ok: true, latest: normalizedLatest };
 }
 
 async function resolvePkgRouteTarget(requestUrl, env, requestHeaders) {
@@ -613,7 +619,11 @@ async function handleProxyRoute(target, env, request, ctx) {
   if (!hasConditionalHeaders) {
     const cached = await cache.match(cacheKey);
     if (cached) {
-      return withCors(cached);
+      let cachedResponse = cached;
+      if (target.fromPkgRoute) {
+        cachedResponse = withMarkdownContentTypeIfNeeded(cachedResponse, target.targetPath);
+      }
+      return withCors(cachedResponse);
     }
   }
 

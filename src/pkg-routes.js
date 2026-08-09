@@ -2,6 +2,23 @@ const AGENT_FILE_EXT = ".agent.md";
 const INSTRUCTIONS_FILE = "instructions.json";
 const AGENTS_DIR = "agents";
 const FLOWS_DIR = "flows";
+const PACKAGE_VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+function isSafePathSegment(segment) {
+  return Boolean(segment) && segment !== "." && segment !== "..";
+}
+
+export function isSafePackageVersion(version) {
+  if (!isSafePathSegment(version)) {
+    return false;
+  }
+
+  if (version.includes("/") || version.includes("\\")) {
+    return false;
+  }
+
+  return PACKAGE_VERSION_PATTERN.test(version);
+}
 
 function isShortAliasResourceSegment(segment) {
   return segment === AGENTS_DIR || segment === FLOWS_DIR || segment === INSTRUCTIONS_FILE;
@@ -22,6 +39,10 @@ export function parsePkgPath(normalizedPath) {
   }
 
   const [namespace, packageId, third, fourth, fifth] = segments;
+
+  if (!isSafePathSegment(namespace) || !isSafePathSegment(packageId)) {
+    return null;
+  }
 
   if (!namespace || !packageId) {
     return null;
@@ -46,6 +67,10 @@ export function parsePkgPath(normalizedPath) {
       return null;
     }
 
+    if (!isSafePathSegment(fourth)) {
+      return null;
+    }
+
     return {
       namespace,
       packageId,
@@ -59,6 +84,14 @@ export function parsePkgPath(normalizedPath) {
   const resourceSegment = fourth;
 
   if (!version || !resourceSegment) {
+    return null;
+  }
+
+  if (!isSafePackageVersion(version)) {
+    return null;
+  }
+
+  if (!isSafePathSegment(resourceSegment)) {
     return null;
   }
 
@@ -81,6 +114,10 @@ export function parsePkgPath(normalizedPath) {
   }
 
   if (segments.length !== 5 || !fifth) {
+    return null;
+  }
+
+  if (!isSafePathSegment(fifth)) {
     return null;
   }
 
@@ -177,11 +214,11 @@ export async function resolvePkgProxyTarget(requestUrl, deps) {
     const queryVersion = requestUrl.searchParams.get("version");
     if (queryVersion !== null) {
       const normalizedVersion = String(queryVersion).trim();
-      if (!normalizedVersion) {
+      if (!isSafePackageVersion(normalizedVersion)) {
         return {
           kind: "pkg_error",
           status: 400,
-          payload: jsonResponsePayload("invalid_version", "Query parameter version must be a non-empty semver."),
+          payload: jsonResponsePayload("invalid_version", "Query parameter version must be a valid semver."),
         };
       }
       version = normalizedVersion;
@@ -207,6 +244,14 @@ export async function resolvePkgProxyTarget(requestUrl, deps) {
     }
 
     version = manifestResult.latest;
+  }
+
+  if (!isSafePackageVersion(version)) {
+    return {
+      kind: "pkg_error",
+      status: 400,
+      payload: jsonResponsePayload("invalid_version", "Resolved package version must be a valid semver."),
+    };
   }
 
   const targetPath = buildCanonicalPackagePath(
