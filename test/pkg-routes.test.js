@@ -208,6 +208,12 @@ test("parsePkgPath rejects unsafe version segment in path", () => {
   );
 });
 
+test("parsePkgPath rejects encoded path separators in package segments", () => {
+  assert.equal(parsePkgPath("pkg/agents-repo%2Fevil/hello-agent/instructions.json"), null);
+  assert.equal(parsePkgPath("pkg/agents-repo/hello%5Cagent/instructions.json"), null);
+  assert.equal(parsePkgPath("pkg/agents-repo/hello-agent/agents/plan%2Fner"), null);
+});
+
 test("isSafePackageVersion accepts semver and rejects path injection", () => {
   assert.equal(isSafePackageVersion("1.0.0"), true);
   assert.equal(isSafePackageVersion("1.0.1"), true);

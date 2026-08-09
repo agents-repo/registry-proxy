@@ -4,8 +4,20 @@ const AGENTS_DIR = "agents";
 const FLOWS_DIR = "flows";
 const PACKAGE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
+function segmentContainsPathSeparatorEncoding(segment) {
+  return /%2[fF]|%5[cC]/.test(segment);
+}
+
 function isSafePathSegment(segment) {
-  return Boolean(segment) && segment !== "." && segment !== "..";
+  if (!segment || segment === "." || segment === "..") {
+    return false;
+  }
+
+  if (segment.includes("/") || segment.includes("\\")) {
+    return false;
+  }
+
+  return !segmentContainsPathSeparatorEncoding(segment);
 }
 
 export function isSafePackageVersion(version) {
@@ -13,7 +25,7 @@ export function isSafePackageVersion(version) {
     return false;
   }
 
-  if (version.includes("/") || version.includes("\\")) {
+  if (version.includes("/") || version.includes("\\") || segmentContainsPathSeparatorEncoding(version)) {
     return false;
   }
 

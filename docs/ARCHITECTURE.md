@@ -50,7 +50,7 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 - Rewritten upstream target:
   `packages/<namespace>/<package-id>/versions/<version>/...` (immutable version snapshot).
 - Markdown responses from `/pkg/` routes MAY receive `Content-Type: text/markdown; charset=utf-8`
-  when upstream omits a content type.
+  when upstream omits a content type or returns `text/plain`.
 
 ## Method Policy
 

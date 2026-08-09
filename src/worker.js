@@ -693,13 +693,6 @@ function finishProxyTargetResponse(target, env, request, ctx) {
 async function handlePkgRouteRequest(requestUrl, env, request, ctx) {
   const pkgTarget = await resolvePkgRouteTarget(requestUrl, env, request.headers);
 
-  if (pkgTarget === null) {
-    return pkgErrorResponse({
-      error: "invalid_pkg_path",
-      message: "Unsupported /pkg/ path shape.",
-    }, 400);
-  }
-
   if (pkgTarget.kind === "pkg_error") {
     return pkgErrorResponse(pkgTarget.payload, pkgTarget.status ?? 400);
   }
