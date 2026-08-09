@@ -662,42 +662,7 @@ async function handleProxyRoute(target, env, request, ctx) {
   return responseWithCors;
 }
 
-async function handleWorkerGet(request, env, ctx) {
-  const requestUrl = new URL(request.url);
-  const normalizedPath = normalizePath(requestUrl.pathname);
-  if (normalizedPath !== null && (normalizedPath === "pkg" || normalizedPath.startsWith("pkg/"))) {
-    const pkgTarget = await resolvePkgRouteTarget(requestUrl, env, request.headers);
-
-    if (pkgTarget === null) {
-      return pkgErrorResponse({
-        error: "invalid_pkg_path",
-        message: "Unsupported /pkg/ path shape.",
-      }, 400);
-    }
-
-    if (pkgTarget.kind === "missing_ref") {
-      return missingRefResponse();
-    }
-
-    if (pkgTarget.kind === "invalid_path") {
-      return invalidPathResponse();
-    }
-
-    if (pkgTarget.kind === "pkg_error") {
-      return pkgErrorResponse(pkgTarget.payload, pkgTarget.status ?? 400);
-    }
-
-    if (pkgTarget.kind === "proxy" && isLegacyFlatPackagePath(pkgTarget.targetPath)) {
-      return legacyFlatPathResponse();
-    }
-
-    if (pkgTarget.kind === "proxy") {
-      return handleProxyRoute(pkgTarget, env, request, ctx);
-    }
-  }
-
-  const target = getProxyTarget(requestUrl);
-
+function finishProxyTargetResponse(target, env, request, ctx) {
   if (target.kind === "usage") {
     return usageResponse();
   }
@@ -716,6 +681,51 @@ async function handleWorkerGet(request, env, ctx) {
 
   if (target.kind === "tags") {
     return handleTagsRoute(env, ctx);
+  }
+
+  if (target.kind === "proxy") {
+    return handleProxyRoute(target, env, request, ctx);
+  }
+
+  return null;
+}
+
+async function handlePkgRouteRequest(requestUrl, env, request, ctx) {
+  const pkgTarget = await resolvePkgRouteTarget(requestUrl, env, request.headers);
+
+  if (pkgTarget === null) {
+    return pkgErrorResponse({
+      error: "invalid_pkg_path",
+      message: "Unsupported /pkg/ path shape.",
+    }, 400);
+  }
+
+  if (pkgTarget.kind === "pkg_error") {
+    return pkgErrorResponse(pkgTarget.payload, pkgTarget.status ?? 400);
+  }
+
+  const response = finishProxyTargetResponse(pkgTarget, env, request, ctx);
+  if (response) {
+    return response;
+  }
+
+  return pkgErrorResponse({
+    error: "invalid_pkg_path",
+    message: "Unsupported /pkg/ path shape.",
+  }, 400);
+}
+
+async function handleWorkerGet(request, env, ctx) {
+  const requestUrl = new URL(request.url);
+  const normalizedPath = normalizePath(requestUrl.pathname);
+  if (normalizedPath !== null && (normalizedPath === "pkg" || normalizedPath.startsWith("pkg/"))) {
+    return handlePkgRouteRequest(requestUrl, env, request, ctx);
+  }
+
+  const target = getProxyTarget(requestUrl);
+  const response = finishProxyTargetResponse(target, env, request, ctx);
+  if (response) {
+    return response;
   }
 
   return handleProxyRoute(target, env, request, ctx);

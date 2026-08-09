@@ -2,7 +2,7 @@ const AGENT_FILE_EXT = ".agent.md";
 const INSTRUCTIONS_FILE = "instructions.json";
 const AGENTS_DIR = "agents";
 const FLOWS_DIR = "flows";
-const PACKAGE_VERSION_PATTERN = /^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const PACKAGE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function isSafePathSegment(segment) {
   return Boolean(segment) && segment !== "." && segment !== "..";
@@ -24,12 +24,72 @@ function isShortAliasResourceSegment(segment) {
   return segment === AGENTS_DIR || segment === FLOWS_DIR || segment === INSTRUCTIONS_FILE;
 }
 
+function pkgParsed(namespace, packageId, version, resourceKind, resourceId) {
+  return { namespace, packageId, version, resourceKind, resourceId };
+}
+
+function parseShortAliasPkgSegments(segments, namespace, packageId, third, fourth) {
+  if (third === INSTRUCTIONS_FILE) {
+    if (segments.length !== 3) {
+      return null;
+    }
+
+    return pkgParsed(namespace, packageId, null, "instructions", INSTRUCTIONS_FILE);
+  }
+
+  if (segments.length !== 4 || !fourth || !isSafePathSegment(fourth)) {
+    return null;
+  }
+
+  return pkgParsed(
+    namespace,
+    packageId,
+    null,
+    third === AGENTS_DIR ? "agent" : "flow",
+    fourth,
+  );
+}
+
+function parseVersionedPkgSegments(segments, namespace, packageId, version, resourceSegment, fifth) {
+  if (!version || !resourceSegment) {
+    return null;
+  }
+
+  if (!isSafePackageVersion(version) || !isSafePathSegment(resourceSegment)) {
+    return null;
+  }
+
+  if (resourceSegment === INSTRUCTIONS_FILE) {
+    if (segments.length !== 4) {
+      return null;
+    }
+
+    return pkgParsed(namespace, packageId, version, "instructions", INSTRUCTIONS_FILE);
+  }
+
+  if (resourceSegment !== AGENTS_DIR && resourceSegment !== FLOWS_DIR) {
+    return null;
+  }
+
+  if (segments.length !== 5 || !fifth || !isSafePathSegment(fifth)) {
+    return null;
+  }
+
+  return pkgParsed(
+    namespace,
+    packageId,
+    version,
+    resourceSegment === AGENTS_DIR ? "agent" : "flow",
+    fifth,
+  );
+}
+
 /**
  * @param {string} normalizedPath - Path without leading slashes (from normalizePath).
  * @returns {null | { namespace: string, packageId: string, version: string | null, resourceKind: 'instructions' | 'agent' | 'flow', resourceId: string }}
  */
 export function parsePkgPath(normalizedPath) {
-  if (!normalizedPath || !normalizedPath.startsWith("pkg/")) {
+  if (!normalizedPath?.startsWith("pkg/")) {
     return null;
   }
 
@@ -40,94 +100,15 @@ export function parsePkgPath(normalizedPath) {
 
   const [namespace, packageId, third, fourth, fifth] = segments;
 
-  if (!isSafePathSegment(namespace) || !isSafePathSegment(packageId)) {
-    return null;
-  }
-
-  if (!namespace || !packageId) {
+  if (!namespace || !packageId || !isSafePathSegment(namespace) || !isSafePathSegment(packageId)) {
     return null;
   }
 
   if (isShortAliasResourceSegment(third)) {
-    if (third === INSTRUCTIONS_FILE) {
-      if (segments.length !== 3) {
-        return null;
-      }
-
-      return {
-        namespace,
-        packageId,
-        version: null,
-        resourceKind: "instructions",
-        resourceId: INSTRUCTIONS_FILE,
-      };
-    }
-
-    if (segments.length !== 4 || !fourth) {
-      return null;
-    }
-
-    if (!isSafePathSegment(fourth)) {
-      return null;
-    }
-
-    return {
-      namespace,
-      packageId,
-      version: null,
-      resourceKind: third === AGENTS_DIR ? "agent" : "flow",
-      resourceId: fourth,
-    };
+    return parseShortAliasPkgSegments(segments, namespace, packageId, third, fourth);
   }
 
-  const version = third;
-  const resourceSegment = fourth;
-
-  if (!version || !resourceSegment) {
-    return null;
-  }
-
-  if (!isSafePackageVersion(version)) {
-    return null;
-  }
-
-  if (!isSafePathSegment(resourceSegment)) {
-    return null;
-  }
-
-  if (resourceSegment === INSTRUCTIONS_FILE) {
-    if (segments.length !== 4) {
-      return null;
-    }
-
-    return {
-      namespace,
-      packageId,
-      version,
-      resourceKind: "instructions",
-      resourceId: INSTRUCTIONS_FILE,
-    };
-  }
-
-  if (resourceSegment !== AGENTS_DIR && resourceSegment !== FLOWS_DIR) {
-    return null;
-  }
-
-  if (segments.length !== 5 || !fifth) {
-    return null;
-  }
-
-  if (!isSafePathSegment(fifth)) {
-    return null;
-  }
-
-  return {
-    namespace,
-    packageId,
-    version,
-    resourceKind: resourceSegment === AGENTS_DIR ? "agent" : "flow",
-    resourceId: fifth,
-  };
+  return parseVersionedPkgSegments(segments, namespace, packageId, third, fourth, fifth);
 }
 
 function ensureAgentMarkdownFilename(resourceId) {
@@ -171,6 +152,85 @@ function jsonResponsePayload(error, message, extra = {}) {
   };
 }
 
+function invalidPkgPathResult() {
+  return {
+    kind: "pkg_error",
+    status: 400,
+    payload: jsonResponsePayload("invalid_pkg_path", "Unsupported /pkg/ path shape."),
+  };
+}
+
+function invalidVersionResult(message) {
+  return {
+    kind: "pkg_error",
+    status: 400,
+    payload: jsonResponsePayload("invalid_version", message),
+  };
+}
+
+function manifestUnavailableResult(manifestPath, ref, manifestStatus) {
+  const status = manifestStatus && manifestStatus >= 400 && manifestStatus < 500
+    ? manifestStatus
+    : 502;
+
+  return {
+    kind: "pkg_error",
+    status,
+    payload: jsonResponsePayload(
+      "manifest_unavailable",
+      "Could not resolve package version from versions/manifest.json latest.",
+      { manifestPath, ref },
+    ),
+  };
+}
+
+function versionFromQueryParameter(requestUrl) {
+  const queryVersion = requestUrl.searchParams.get("version");
+  if (queryVersion === null) {
+    return { ok: true, version: null };
+  }
+
+  const normalizedVersion = String(queryVersion).trim();
+  if (!isSafePackageVersion(normalizedVersion)) {
+    return {
+      ok: false,
+      result: invalidVersionResult("Query parameter version must be a valid semver."),
+    };
+  }
+
+  return { ok: true, version: normalizedVersion };
+}
+
+async function versionFromManifest(parsed, ref, fetchManifestLatest) {
+  const manifestPath = manifestPathForPackage(parsed.namespace, parsed.packageId);
+  const manifestResult = await fetchManifestLatest(ref, manifestPath);
+  if (!manifestResult.ok) {
+    return {
+      ok: false,
+      result: manifestUnavailableResult(manifestPath, ref, manifestResult.status),
+    };
+  }
+
+  return { ok: true, version: manifestResult.latest };
+}
+
+async function resolveEffectivePackageVersion(parsed, requestUrl, ref, fetchManifestLatest) {
+  if (parsed.version) {
+    return { ok: true, version: parsed.version };
+  }
+
+  const fromQuery = versionFromQueryParameter(requestUrl);
+  if (!fromQuery.ok) {
+    return fromQuery;
+  }
+
+  if (fromQuery.version) {
+    return { ok: true, version: fromQuery.version };
+  }
+
+  return versionFromManifest(parsed, ref, fetchManifestLatest);
+}
+
 /**
  * @param {URL} requestUrl
  * @param {{
@@ -189,11 +249,7 @@ export async function resolvePkgProxyTarget(requestUrl, deps) {
   const parsed = parsePkgPath(path);
   if (!parsed) {
     if (path === "pkg" || path.startsWith("pkg/")) {
-      return {
-        kind: "pkg_error",
-        status: 400,
-        payload: jsonResponsePayload("invalid_pkg_path", "Unsupported /pkg/ path shape."),
-      };
+      return invalidPkgPathResult();
     }
 
     return null;
@@ -209,49 +265,14 @@ export async function resolvePkgProxyTarget(requestUrl, deps) {
     return { kind: "invalid_path" };
   }
 
-  let version = parsed.version;
-  if (!version) {
-    const queryVersion = requestUrl.searchParams.get("version");
-    if (queryVersion !== null) {
-      const normalizedVersion = String(queryVersion).trim();
-      if (!isSafePackageVersion(normalizedVersion)) {
-        return {
-          kind: "pkg_error",
-          status: 400,
-          payload: jsonResponsePayload("invalid_version", "Query parameter version must be a valid semver."),
-        };
-      }
-      version = normalizedVersion;
-    }
+  const versionResult = await resolveEffectivePackageVersion(parsed, requestUrl, ref, fetchManifestLatest);
+  if (!versionResult.ok) {
+    return versionResult.result;
   }
 
-  if (!version) {
-    const manifestPath = manifestPathForPackage(parsed.namespace, parsed.packageId);
-    const manifestResult = await fetchManifestLatest(ref, manifestPath);
-    if (!manifestResult.ok) {
-      const status = manifestResult.status && manifestResult.status >= 400 && manifestResult.status < 500
-        ? manifestResult.status
-        : 502;
-      return {
-        kind: "pkg_error",
-        status,
-        payload: jsonResponsePayload(
-          "manifest_unavailable",
-          "Could not resolve package version from versions/manifest.json latest.",
-          { manifestPath, ref },
-        ),
-      };
-    }
-
-    version = manifestResult.latest;
-  }
-
+  const { version } = versionResult;
   if (!isSafePackageVersion(version)) {
-    return {
-      kind: "pkg_error",
-      status: 400,
-      payload: jsonResponsePayload("invalid_version", "Resolved package version must be a valid semver."),
-    };
+    return invalidVersionResult("Resolved package version must be a valid semver.");
   }
 
   const targetPath = buildCanonicalPackagePath(
