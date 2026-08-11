@@ -86,7 +86,7 @@ function isLegacyFlatPackagePath(targetPath) {
 
 function usagePayload() {
   return {
-    message: "Use this Worker to proxy files from agents-repo/registry by ref. When ref is omitted, main is used.",
+    message: `Use this Worker to proxy files from agents-repo/registry by ref. When ref is omitted, ${DEFAULT_REF} is used.`,
     repository: `${REPO_OWNER}/${REPO_NAME}`,
     default_ref: DEFAULT_REF,
     supported_formats: [
