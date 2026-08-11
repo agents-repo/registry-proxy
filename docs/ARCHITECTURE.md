@@ -11,6 +11,8 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 3. Worker checks `caches.default` by resolved upstream URL.
 4. On miss, Worker fetches GitHub Raw when no token is present, or GitHub Contents API with `Accept: application/vnd.github.raw` when `GITHUB_TOKEN` is present. Tag listing always uses the GitHub tags API with optional token auth.
 5. Worker returns upstream response and caches successful results.
+6. For HTTP 200 file responses, Worker normalizes `Content-Type` from the
+   requested path extension when mapped (see **Content-Type normalization**).
 
 ## Components
 
@@ -24,6 +26,44 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 - Upstream base: `https://raw.githubusercontent.com/agents-repo/registry`
 - Resolved upstream: `https://raw.githubusercontent.com/agents-repo/registry/main/packages/index.json`
 - Authenticated upstream (when token exists): `https://api.github.com/repos/agents-repo/registry/contents/packages/index.json?ref=main`
+- Omitted ref (non-path-style): `/packages/index.json` and `/README.md` resolve with default ref `main`
+
+## Content-Type normalization
+
+Applied to all file-proxy HTTP 200 responses (cache hit and miss), not only
+`/pkg/`. Non-200 responses keep the upstream `Content-Type` unchanged.
+Extension is taken from the final path basename (case-insensitive), ignoring
+query strings.
+
+### Extension mappings
+
+When the basename extension is listed below, the Worker sets the response
+`Content-Type` to the mapped value. This overrides any upstream type, including
+`application/vnd.github.raw`.
+
+| Extension | Response `Content-Type` |
+| --- | --- |
+| `.css` | `text/css; charset=utf-8` |
+| `.htm` | `text/html; charset=utf-8` |
+| `.html` | `text/html; charset=utf-8` |
+| `.js` | `text/javascript; charset=utf-8` |
+| `.json` | `application/json; charset=utf-8` |
+| `.md` | `text/markdown; charset=utf-8` |
+| `.svg` | `image/svg+xml` |
+| `.txt` | `text/plain; charset=utf-8` |
+| `.xml` | `application/xml; charset=utf-8` |
+| `.yaml` | `text/yaml; charset=utf-8` |
+| `.yml` | `text/yaml; charset=utf-8` |
+| `.zip` | `application/zip` |
+
+### Unmapped extensions
+
+When the extension is not in the table above:
+
+| Upstream `Content-Type` | Response `Content-Type` |
+| --- | --- |
+| `application/vnd.github.raw` | `application/octet-stream` |
+| any other | unchanged (upstream value preserved) |
 
 ## Tags Listing
 
@@ -41,7 +81,8 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 
 ## Pkg alias routes
 
-- Incoming paths MUST start with `/pkg/` and use query `ref` only (no `/<ref>/pkg/...` in MVP).
+- Incoming paths MUST start with `/pkg/` and use optional query `ref` only (no `/<ref>/pkg/...` in MVP).
+- When query `ref` is omitted, the Worker defaults to `main`.
 - Two supported families:
   - Version in path: `/pkg/<namespace>/<package-id>/<version>/agents|flows|instructions.json`
   - Short alias: `/pkg/<namespace>/<package-id>/agents|flows/<id>` or `.../instructions.json`
@@ -49,8 +90,8 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
   `packages/<namespace>/<package-id>/versions/manifest.json` at `ref` and uses `latest`.
 - Rewritten upstream target:
   `packages/<namespace>/<package-id>/versions/<version>/...` (immutable version snapshot).
-- Markdown responses from `/pkg/` routes MAY receive `Content-Type: text/markdown; charset=utf-8`
-  when upstream omits a content type or returns `text/plain`.
+- File responses use the shared Content-Type normalization rules above (for example
+  `.agent.md` → `text/markdown; charset=utf-8`).
 
 ## Method Policy
 

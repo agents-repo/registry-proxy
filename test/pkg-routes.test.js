@@ -146,17 +146,25 @@ test("resolvePkgProxyTarget resolves latest from manifest when version omitted",
   });
 });
 
-test("resolvePkgProxyTarget returns missing_ref without query ref", async () => {
+test("resolvePkgProxyTarget defaults omitted ref to main", async () => {
   const target = await resolvePkgProxyTarget(
     new URL("https://worker.example/pkg/agents-repo/hello-agent/instructions.json"),
     {
       normalizePath,
       normalizeRef,
-      fetchManifestLatest: async () => ({ ok: true, latest: "1.0.0" }),
+      fetchManifestLatest: async (ref) => {
+        assert.equal(ref, "main");
+        return { ok: true, latest: "1.0.0" };
+      },
     },
   );
 
-  assert.deepEqual(target, { kind: "missing_ref" });
+  assert.deepEqual(target, {
+    kind: "proxy",
+    ref: "main",
+    targetPath: "packages/agents-repo/hello-agent/versions/1.0.0/instructions.json",
+    fromPkgRoute: true,
+  });
 });
 
 test("resolvePkgProxyTarget rejects unsafe pkg paths", async () => {
