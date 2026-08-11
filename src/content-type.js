@@ -1,7 +1,7 @@
 const GITHUB_RAW_MEDIA_TYPE = "application/vnd.github.raw";
 
 export const EXTENSION_CONTENT_TYPES = Object.freeze({
-  ".md": "text/markdown; charset=utf-8",
+  ".md": "text/plain; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
   ".yaml": "text/yaml; charset=utf-8",

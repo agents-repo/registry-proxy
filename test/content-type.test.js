@@ -17,7 +17,7 @@ test("getExtension returns lowercase final extension", () => {
 test("resolveContentType maps known extensions over upstream types", () => {
   assert.equal(
     resolveContentType("hello.agent.md", "application/vnd.github.raw"),
-    "text/markdown; charset=utf-8",
+    "text/plain; charset=utf-8",
   );
   assert.equal(
     resolveContentType("index.json", "text/plain"),
@@ -37,7 +37,7 @@ test("resolveContentType maps known extensions over upstream types", () => {
   );
   assert.equal(
     resolveContentType("Doc.MD", "text/plain"),
-    "text/markdown; charset=utf-8",
+    "text/plain; charset=utf-8",
   );
 });
 
@@ -69,7 +69,7 @@ test("withResolvedContentType rewrites 200 responses and preserves headers", asy
   });
 
   const rewritten = withResolvedContentType(upstream, "agents/hello.agent.md");
-  assert.equal(rewritten.headers.get("content-type"), "text/markdown; charset=utf-8");
+  assert.equal(rewritten.headers.get("content-type"), "text/plain; charset=utf-8");
   assert.equal(rewritten.headers.get("etag"), '"abc"');
   assert.equal(rewritten.headers.get("content-length"), "5");
   assert.equal(rewritten.headers.get("last-modified"), "Wed, 21 Oct 2015 07:28:00 GMT");

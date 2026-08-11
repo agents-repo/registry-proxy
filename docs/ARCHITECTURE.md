@@ -48,7 +48,7 @@ When the basename extension is listed below, the Worker sets the response
 | `.html` | `text/html; charset=utf-8` |
 | `.js` | `text/javascript; charset=utf-8` |
 | `.json` | `application/json; charset=utf-8` |
-| `.md` | `text/markdown; charset=utf-8` |
+| `.md` | `text/plain; charset=utf-8` |
 | `.svg` | `image/svg+xml` |
 | `.txt` | `text/plain; charset=utf-8` |
 | `.xml` | `application/xml; charset=utf-8` |
@@ -91,7 +91,7 @@ When the extension is not in the table above:
 - Rewritten upstream target:
   `packages/<namespace>/<package-id>/versions/<version>/...` (immutable version snapshot).
 - File responses use the shared Content-Type normalization rules above (for example
-  `.agent.md` → `text/markdown; charset=utf-8`).
+  `.agent.md` → `text/plain; charset=utf-8`).
 
 ## Method Policy
 

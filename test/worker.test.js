@@ -933,7 +933,7 @@ test("fetch proxies /pkg short alias with version query to canonical upstream pa
 
     assert.equal(response.status, 200);
     assert.equal(await response.text(), "# Hello");
-    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
     assert.equal(fetchedUrls.length, 1);
     assert.match(
       fetchedUrls[0],
@@ -1023,22 +1023,23 @@ test("fetch normalizes content-type on cached responses including github raw", a
 
     const firstResponse = await worker.fetch(pkgRequest, {}, { waitUntil() {} });
     assert.equal(firstResponse.status, 200);
-    assert.equal(firstResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.equal(firstResponse.headers.get("content-type"), "text/plain; charset=utf-8");
 
     const secondResponse = await worker.fetch(pkgRequest, {}, { waitUntil() {} });
     assert.equal(secondResponse.status, 200);
-    assert.equal(secondResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.equal(secondResponse.headers.get("content-type"), "text/plain; charset=utf-8");
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
   }
 });
 
-test("fetch serves hello-agent.agent.md with markdown content-type (regression)", async () => {
+test("fetch serves hello-agent.agent.md with text/plain content-type (regression)", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
   const upstreamUrl =
     "https://raw.githubusercontent.com/agents-repo/registry/main/packages/agents-repo/hello-agent/versions/1.0.1/agents/hello-agent.agent.md";
+  const upstreamBody = "# Overview\n\nResponds with a simple hello workflow";
 
   try {
     globalThis.caches = {
@@ -1052,7 +1053,7 @@ test("fetch serves hello-agent.agent.md with markdown content-type (regression)"
 
     globalThis.fetch = async (url) => {
       assert.equal(String(url), upstreamUrl);
-      return new Response("# Hello Agent", {
+      return new Response(upstreamBody, {
         status: 200,
         headers: { "content-type": "application/vnd.github.raw" },
       });
@@ -1067,8 +1068,8 @@ test("fetch serves hello-agent.agent.md with markdown content-type (regression)"
     );
 
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
-    assert.equal(await response.text(), "# Hello Agent");
+    assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
+    assert.equal(await response.text(), upstreamBody);
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
@@ -1107,7 +1108,7 @@ test("fetch serves hello-agent.agent.md without ref using default main", async (
     );
 
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.equal(response.headers.get("content-type"), "text/plain; charset=utf-8");
     assert.match(
       fetchedUrls[0],
       /\/main\/packages\/agents-repo\/hello-agent\/versions\/1\.0\.1\/agents\/hello-agent\.agent\.md$/,
@@ -1118,7 +1119,7 @@ test("fetch serves hello-agent.agent.md without ref using default main", async (
   }
 });
 
-test("fetch normalizes markdown json txt and zip content types", async () => {
+test("fetch normalizes plain md json txt and zip content types", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
 
@@ -1136,7 +1137,12 @@ test("fetch normalizes markdown json txt and zip content types", async () => {
       {
         requestPath: "/README.md?ref=main&utm=1",
         upstreamPath: "/main/README.md",
-        expectedType: "text/markdown; charset=utf-8",
+        expectedType: "text/plain; charset=utf-8",
+      },
+      {
+        requestPath: "/README.md?ref=main&version=1.0.1",
+        upstreamPath: "/main/README.md",
+        expectedType: "text/plain; charset=utf-8",
       },
       {
         requestPath: "/packages/index.json?ref=main",
