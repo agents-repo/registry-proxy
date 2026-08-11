@@ -50,7 +50,7 @@ curl -i "https://<worker>.workers.dev/pkg/agents-repo/hello-agent/1.0.1/agents/h
 curl -i "https://<worker>.workers.dev/tags"
 ```
 
-Confirm Markdown responses include `Content-Type: text/plain; charset=utf-8`.
+Confirm `.md` responses include `Content-Type: text/plain; charset=utf-8`.
 Repeat one request to confirm cache reuse behavior.
 
 The webapp uses `/tags` for version-line alias resolution (`v1.x`, `v1.2.x`). Deploy this endpoint before merging dependent webapp changes.
