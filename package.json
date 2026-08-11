@@ -10,7 +10,7 @@
     "lint:js": "eslint \"**/*.{js,mjs}\"",
     "lint:yaml": "node scripts/lint-yaml.js",
     "lint:workflows": "node scripts/lint-workflows.mjs",
-    "lint:all": "npm run lint:md && npm run lint:js && npm run lint:yaml && npm run lint:workflows",
+    "lint:all": "markdownlint-cli2 \"**/*.md\" \"**/.*/**/*.md\" && eslint \"**/*.{js,mjs}\" && node scripts/lint-yaml.js && node scripts/lint-workflows.mjs",
     "sync:ide-instructions": "node scripts/sync-ide-instructions.mjs",
     "agents:install": "agents-repo install",
     "agents:update": "agents-repo update",
