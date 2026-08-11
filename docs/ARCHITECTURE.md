@@ -30,13 +30,40 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 
 ## Content-Type normalization
 
-- Applied to all file-proxy HTTP 200 responses (cache hit and miss), not only `/pkg/`.
-- Extension is taken from the final path basename (case-insensitive), ignoring query strings.
-- Mapped examples: `.md` → `text/markdown; charset=utf-8`, `.json` →
-  `application/json; charset=utf-8`, `.zip` → `application/zip`.
-- Mapped types override upstream types, including `application/vnd.github.raw`.
-- Unknown extensions with upstream `application/vnd.github.raw` fall back to
-  `application/octet-stream`. Other unknown upstream types are preserved.
+Applied to all file-proxy HTTP 200 responses (cache hit and miss), not only
+`/pkg/`. Non-200 responses keep the upstream `Content-Type` unchanged.
+Extension is taken from the final path basename (case-insensitive), ignoring
+query strings.
+
+### Extension mappings
+
+When the basename extension is listed below, the Worker sets the response
+`Content-Type` to the mapped value. This overrides any upstream type, including
+`application/vnd.github.raw`.
+
+| Extension | Response `Content-Type` |
+| --- | --- |
+| `.css` | `text/css; charset=utf-8` |
+| `.htm` | `text/html; charset=utf-8` |
+| `.html` | `text/html; charset=utf-8` |
+| `.js` | `text/javascript; charset=utf-8` |
+| `.json` | `application/json; charset=utf-8` |
+| `.md` | `text/markdown; charset=utf-8` |
+| `.svg` | `image/svg+xml` |
+| `.txt` | `text/plain; charset=utf-8` |
+| `.xml` | `application/xml; charset=utf-8` |
+| `.yaml` | `text/yaml; charset=utf-8` |
+| `.yml` | `text/yaml; charset=utf-8` |
+| `.zip` | `application/zip` |
+
+### Unmapped extensions
+
+When the extension is not in the table above:
+
+| Upstream `Content-Type` | Response `Content-Type` |
+| --- | --- |
+| `application/vnd.github.raw` | `application/octet-stream` |
+| any other | unchanged (upstream value preserved) |
 
 ## Tags Listing
 
