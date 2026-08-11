@@ -43,10 +43,14 @@ Capture the generated workers.dev URL.
 
 ```bash
 curl -i "https://<worker>.workers.dev/main/packages/index.json"
+curl -i "https://<worker>.workers.dev/packages/index.json"
 curl -i "https://<worker>.workers.dev/packages/index.json?ref=main"
+curl -i "https://<worker>.workers.dev/README.md"
+curl -i "https://<worker>.workers.dev/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md"
 curl -i "https://<worker>.workers.dev/tags"
 ```
 
+Confirm Markdown responses include `Content-Type: text/markdown; charset=utf-8`.
 Repeat one request to confirm cache reuse behavior.
 
 The webapp uses `/tags` for version-line alias resolution (`v1.x`, `v1.2.x`). Deploy this endpoint before merging dependent webapp changes.

@@ -4,6 +4,9 @@ const AGENTS_DIR = "agents";
 const FLOWS_DIR = "flows";
 const PACKAGE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
+/** Default Git ref when query `ref` is omitted. */
+export const DEFAULT_REF = "main";
+
 function segmentContainsPathSeparatorEncoding(segment) {
   return /%2[fF]|%5[cC]/.test(segment);
 }
@@ -268,11 +271,7 @@ export async function resolvePkgProxyTarget(requestUrl, deps) {
   }
 
   const queryRef = requestUrl.searchParams.get("ref");
-  if (queryRef === null) {
-    return { kind: "missing_ref" };
-  }
-
-  const ref = normalizeRef(queryRef);
+  const ref = queryRef === null ? DEFAULT_REF : normalizeRef(queryRef);
   if (!ref) {
     return { kind: "invalid_path" };
   }

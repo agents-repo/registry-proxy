@@ -1,4 +1,5 @@
-import { resolvePkgProxyTarget, isSafePackageVersion } from "./pkg-routes.js";
+import { resolvePkgProxyTarget, isSafePackageVersion, DEFAULT_REF } from "./pkg-routes.js";
+import { withResolvedContentType } from "./content-type.js";
 
 const REPO_OWNER = "agents-repo";
 const REPO_NAME = "registry";
@@ -85,22 +86,27 @@ function isLegacyFlatPackagePath(targetPath) {
 
 function usagePayload() {
   return {
-    message: "Use this Worker to proxy files from agents-repo/registry by ref.",
+    message: "Use this Worker to proxy files from agents-repo/registry by ref. When ref is omitted, main is used.",
     repository: `${REPO_OWNER}/${REPO_NAME}`,
+    default_ref: DEFAULT_REF,
     supported_formats: [
       "/<ref>/<path>",
+      "/<path>",
       "/<path>?ref=<ref>",
-      "/pkg/<namespace>/<package-id>/...?ref=<ref>[&version=<semver>]",
+      "/pkg/<namespace>/<package-id>/...[?ref=<ref>][&version=<semver>]",
       "/tags",
     ],
     examples: [
       "/main/packages/index.json",
+      "/packages/index.json",
+      "/README.md",
       "/main/packages/tree.json",
       "/main/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip",
       "/packages/index.json?ref=main",
       "/packages/index.json?ref=release-2026-06",
       "/packages/index.json?ref=v1.0.0",
       "/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f",
+      "/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md",
       "/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0",
       "/pkg/agents-repo/hello-agent/1.0.0/instructions.json?ref=v2.x",
       "/tags",
@@ -114,16 +120,6 @@ function usageResponse() {
 
 function pkgErrorResponse(payload, status = 400) {
   return jsonResponse(payload, status);
-}
-
-function missingRefResponse() {
-  return jsonResponse({
-    error: "missing_ref",
-    message: "A ref is required. Use /<ref>/<path>, /<path>?ref=<ref>, or /pkg/...?ref=<ref>.",
-    repository: `${REPO_OWNER}/${REPO_NAME}`,
-    supported_formats: usagePayload().supported_formats,
-    examples: usagePayload().examples,
-  }, 400);
 }
 
 function invalidPathResponse() {
@@ -276,7 +272,11 @@ function getProxyTarget(requestUrl) {
   }
 
   if (isKnownContentPath(path)) {
-    return { kind: "missing_ref" };
+    return {
+      kind: "proxy",
+      ref: DEFAULT_REF,
+      targetPath: path,
+    };
   }
 
   const pathStyle = splitPathStyle(path);
@@ -293,7 +293,11 @@ function getProxyTarget(requestUrl) {
     };
   }
 
-  return { kind: "missing_ref" };
+  return {
+    kind: "proxy",
+    ref: DEFAULT_REF,
+    targetPath: path,
+  };
 }
 
 function encodeRef(ref) {
@@ -531,38 +535,6 @@ async function handleTagsRoute(env, ctx) {
   return withTagsClientResponse(cacheResponse);
 }
 
-function isMarkdownTargetPath(targetPath) {
-  return targetPath.endsWith(".md") || targetPath.endsWith(".agent.md");
-}
-
-function shouldApplyMarkdownContentType(contentType) {
-  if (!contentType) {
-    return true;
-  }
-
-  const normalized = contentType.toLowerCase().split(";")[0].trim();
-  return normalized === "text/plain";
-}
-
-function withMarkdownContentTypeIfNeeded(response, targetPath) {
-  if (response.status !== 200 || !isMarkdownTargetPath(targetPath)) {
-    return response;
-  }
-
-  const contentType = response.headers.get("content-type");
-  if (!shouldApplyMarkdownContentType(contentType)) {
-    return response;
-  }
-
-  const headers = new Headers(response.headers);
-  headers.set("content-type", "text/markdown; charset=utf-8");
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-}
-
 async function fetchManifestLatest(ref, manifestPath, env, requestHeaders) {
   const target = { ref, targetPath: manifestPath };
   const upstreamRequest = buildUpstreamRequest(target, env, requestHeaders);
@@ -619,10 +591,7 @@ async function handleProxyRoute(target, env, request, ctx) {
   if (!hasConditionalHeaders) {
     const cached = await cache.match(cacheKey);
     if (cached) {
-      let cachedResponse = cached;
-      if (target.fromPkgRoute) {
-        cachedResponse = withMarkdownContentTypeIfNeeded(cachedResponse, target.targetPath);
-      }
+      const cachedResponse = withResolvedContentType(cached, target.targetPath);
       return withCors(cachedResponse);
     }
   }
@@ -649,9 +618,7 @@ async function handleProxyRoute(target, env, request, ctx) {
     headers: responseHeaders,
   });
 
-  if (target.fromPkgRoute) {
-    response = withMarkdownContentTypeIfNeeded(response, target.targetPath);
-  }
+  response = withResolvedContentType(response, target.targetPath);
 
   const responseWithCors = withCors(response);
 
@@ -665,10 +632,6 @@ async function handleProxyRoute(target, env, request, ctx) {
 function finishProxyTargetResponse(target, env, request, ctx) {
   if (target.kind === "usage") {
     return usageResponse();
-  }
-
-  if (target.kind === "missing_ref") {
-    return missingRefResponse();
   }
 
   if (target.kind === "invalid_path") {

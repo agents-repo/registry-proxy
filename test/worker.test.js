@@ -441,10 +441,14 @@ test("getProxyTarget keeps full path when mixed format does not map to a known c
   );
 });
 
-test("getProxyTarget returns missing_ref when no ref can be inferred", () => {
+test("getProxyTarget defaults omitted ref to main for known and bare paths", () => {
   assert.deepEqual(
     getProxyTarget(new URL("https://worker.example/packages/index.json")),
-    { kind: "missing_ref" },
+    { kind: "proxy", ref: "main", targetPath: "packages/index.json" },
+  );
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/README.md")),
+    { kind: "proxy", ref: "main", targetPath: "README.md" },
   );
 });
 
@@ -557,7 +561,7 @@ test("fetch rejects unsupported methods", async () => {
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
 });
 
-test("fetch returns usage and missing_ref responses", async () => {
+test("fetch returns usage and defaults omitted ref for packages paths", async () => {
   const ctx = { waitUntil() {} };
 
   const usage = await worker.fetch(new Request("https://worker.example/main"), {}, ctx);
@@ -565,12 +569,40 @@ test("fetch returns usage and missing_ref responses", async () => {
   assert.equal(usage.headers.get("Access-Control-Allow-Origin"), "*");
   const usageBody = await usage.json();
   assert.equal(usageBody.repository, "agents-repo/registry");
+  assert.equal(usageBody.default_ref, "main");
 
-  const missingRef = await worker.fetch(new Request("https://worker.example/packages/index.json"), {}, ctx);
-  assert.equal(missingRef.status, 400);
-  assert.equal(missingRef.headers.get("Access-Control-Allow-Origin"), "*");
-  const missingRefBody = await missingRef.json();
-  assert.equal(missingRefBody.error, "missing_ref");
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  try {
+    const fetchedUrls = [];
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+    globalThis.fetch = async (url) => {
+      fetchedUrls.push(String(url));
+      return new Response("{}", {
+        status: 200,
+        headers: { "content-type": "application/vnd.github.raw" },
+      });
+    };
+
+    const proxied = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      ctx,
+    );
+    assert.equal(proxied.status, 200);
+    assert.equal(proxied.headers.get("content-type"), "application/json; charset=utf-8");
+    assert.match(fetchedUrls[0], /\/main\/packages\/index\.json$/);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("fetch returns invalid_path for unsafe inputs", async () => {
@@ -913,19 +945,50 @@ test("fetch proxies /pkg short alias with version query to canonical upstream pa
   }
 });
 
-test("fetch returns missing_ref for /pkg routes without ref query", async () => {
-  const response = await worker.fetch(
-    new Request("https://worker.example/pkg/agents-repo/hello-agent/instructions.json"),
-    {},
-    { waitUntil() {} },
-  );
+test("fetch defaults omitted ref for /pkg routes", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
 
-  assert.equal(response.status, 400);
-  const payload = await response.json();
-  assert.equal(payload.error, "missing_ref");
+  try {
+    const fetchedUrls = [];
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async (url) => {
+      fetchedUrls.push(String(url));
+      return new Response('{"latest":"1.0.0"}', {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/pkg/agents-repo/hello-agent/instructions.json"),
+      {},
+      { waitUntil() {} },
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "application/json; charset=utf-8");
+    assert.equal(fetchedUrls.length, 2);
+    assert.match(fetchedUrls[0], /\/main\/packages\/agents-repo\/hello-agent\/versions\/manifest\.json$/);
+    assert.match(
+      fetchedUrls[1],
+      /\/main\/packages\/agents-repo\/hello-agent\/versions\/1\.0\.0\/instructions\.json$/,
+    );
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
 });
 
-test("fetch applies markdown content-type on cached /pkg upstream responses", async () => {
+test("fetch normalizes content-type on cached responses including github raw", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
   const upstreamUrl = "https://raw.githubusercontent.com/agents-repo/registry/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/flows/hello-agents.agent.md";
@@ -947,7 +1010,7 @@ test("fetch applies markdown content-type on cached /pkg upstream responses", as
       if (String(url) === upstreamUrl) {
         return new Response("# Cached", {
           status: 200,
-          headers: { "content-type": "text/plain;charset=UTF-8" },
+          headers: { "content-type": "application/vnd.github.raw" },
         });
       }
 
@@ -965,6 +1028,150 @@ test("fetch applies markdown content-type on cached /pkg upstream responses", as
     const secondResponse = await worker.fetch(pkgRequest, {}, { waitUntil() {} });
     assert.equal(secondResponse.status, 200);
     assert.equal(secondResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves hello-agent.agent.md with markdown content-type (regression)", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const upstreamUrl =
+    "https://raw.githubusercontent.com/agents-repo/registry/main/packages/agents-repo/hello-agent/versions/1.0.1/agents/hello-agent.agent.md";
+
+  try {
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async (url) => {
+      assert.equal(String(url), upstreamUrl);
+      return new Response("# Hello Agent", {
+        status: 200,
+        headers: { "content-type": "application/vnd.github.raw" },
+      });
+    };
+
+    const response = await worker.fetch(
+      new Request(
+        "https://worker.example/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md?ref=main",
+      ),
+      {},
+      { waitUntil() {} },
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.equal(await response.text(), "# Hello Agent");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves hello-agent.agent.md without ref using default main", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const fetchedUrls = [];
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async (url) => {
+      fetchedUrls.push(String(url));
+      return new Response("# Hello Agent", {
+        status: 200,
+        headers: { "content-type": "application/vnd.github.raw" },
+      });
+    };
+
+    const response = await worker.fetch(
+      new Request(
+        "https://worker.example/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md",
+      ),
+      {},
+      { waitUntil() {} },
+    );
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "text/markdown; charset=utf-8");
+    assert.match(
+      fetchedUrls[0],
+      /\/main\/packages\/agents-repo\/hello-agent\/versions\/1\.0\.1\/agents\/hello-agent\.agent\.md$/,
+    );
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch normalizes markdown json txt and zip content types", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    globalThis.caches = {
+      default: {
+        async match() {
+          return undefined;
+        },
+        async put() {},
+      },
+    };
+
+    const cases = [
+      {
+        requestPath: "/README.md?ref=main&utm=1",
+        upstreamPath: "/main/README.md",
+        expectedType: "text/markdown; charset=utf-8",
+      },
+      {
+        requestPath: "/packages/index.json?ref=main",
+        upstreamPath: "/main/packages/index.json",
+        expectedType: "application/json; charset=utf-8",
+      },
+      {
+        requestPath: "/notes.txt",
+        upstreamPath: "/main/notes.txt",
+        expectedType: "text/plain; charset=utf-8",
+      },
+      {
+        requestPath: "/main/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip",
+        upstreamPath: "/main/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip",
+        expectedType: "application/zip",
+      },
+    ];
+
+    for (const testCase of cases) {
+      globalThis.fetch = async (url) => {
+        assert.match(String(url), new RegExp(`${testCase.upstreamPath.replaceAll(".", "\\.")}$`));
+        return new Response("body", {
+          status: 200,
+          headers: { "content-type": "application/vnd.github.raw" },
+        });
+      };
+
+      const response = await worker.fetch(
+        new Request(`https://worker.example${testCase.requestPath}`),
+        {},
+        { waitUntil() {} },
+      );
+      assert.equal(response.status, 200, testCase.requestPath);
+      assert.equal(response.headers.get("content-type"), testCase.expectedType, testCase.requestPath);
+    }
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;

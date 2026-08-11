@@ -68,11 +68,17 @@ Scope is intentionally strict:
 
 ## How It Works
 
-1. A request hits the Worker endpoint in one of the supported formats: `/<ref>/<path>` or `/<path>?ref=<ref>`.
+1. A request hits the Worker endpoint in one of the supported formats:
+   `/<ref>/<path>`, `/<path>`, `/<path>?ref=<ref>`, or `/pkg/...`.
 1. The Worker maps the request to upstream content: `https://raw.githubusercontent.com/agents-repo/registry/<ref>/<path>`, or when `GITHUB_TOKEN` is present, `https://api.github.com/repos/agents-repo/registry/contents/<path>?ref=<ref>` with `Accept: application/vnd.github.raw`.
 1. The Worker checks `caches.default` for a cached response.
 1. On cache miss, it fetches upstream without Authorization for GitHub Raw, or with `Authorization: Bearer <GITHUB_TOKEN>` and `Accept: application/vnd.github.raw` for the Contents API.
 1. Successful upstream responses with status 200 are cached and returned to the caller.
+1. For HTTP 200 file responses, the Worker sets `Content-Type` from the requested
+   path extension when known (for example `.md` → `text/markdown; charset=utf-8`,
+   `.json` → `application/json; charset=utf-8`, `.zip` → `application/zip`).
+   GitHub vendor types such as `application/vnd.github.raw` are not forwarded for
+   mapped extensions.
 
 Guidance routes:
 
@@ -82,7 +88,11 @@ Guidance routes:
 
 These routes return JSON usage guidance and do not proxy upstream.
 
-If no ref is provided for a file request, the Worker returns a `400` JSON response with valid usage examples.
+When `ref` is omitted for a non-path-style file request (including `/packages/...`,
+`/README.md`, and `/pkg/...`), the Worker defaults to Git ref `main`. Path-style
+`/<ref>/<path>` and explicit `?ref=` are unchanged. Prefer an explicit release
+line such as `?ref=v2.x` when you need catalog-line resolution rather than
+branch `main`.
 
 ## Deploy
 
@@ -100,13 +110,16 @@ Detailed deployment and validation steps are in [docs/DEPLOYMENT.md](docs/DEPLOY
 Worker URL pattern:
 
 - `https://<worker>.workers.dev/<ref>/<path>`
+- `https://<worker>.workers.dev/<path>` (defaults to ref `main`)
 - `https://<worker>.workers.dev/<path>?ref=<ref>`
 
 Examples:
 
 - Main branch:
   - `https://<worker>.workers.dev/main/packages/index.json`
+  - `https://<worker>.workers.dev/packages/index.json`
   - `https://<worker>.workers.dev/packages/index.json?ref=main`
+  - `https://<worker>.workers.dev/README.md`
 - Named branch:
   - `https://<worker>.workers.dev/packages/index.json?ref=release-2026-06`
 - Tag:
@@ -120,19 +133,21 @@ Examples:
 
 Chat-web consumers use shorter `/pkg/` paths that always resolve to immutable
 version snapshots under `packages/<namespace>/<package-id>/versions/<version>/...`.
-For `/pkg/` routes, `ref` MUST be supplied as a query parameter (`?ref=<ref>`);
-path-style `/<ref>/pkg/...` is not supported.
+For `/pkg/` routes, query `ref` is optional and defaults to `main`. Path-style
+`/<ref>/pkg/...` is not supported. Pass `?ref=v2.x` (or another release line)
+when you need a catalog tag rather than branch `main`.
 
 Supported shapes:
 
 - Version in path (matches `instructions.json` path fields):
-  - `/pkg/<namespace>/<package-id>/<version>/agents/<agent-id>.agent.md?ref=<ref>`
-  - `/pkg/<namespace>/<package-id>/<version>/flows/<flow-id>.agent.md?ref=<ref>`
-  - `/pkg/<namespace>/<package-id>/<version>/instructions.json?ref=<ref>`
+  - `/pkg/<namespace>/<package-id>/<version>/agents/<agent-id>.agent.md`
+  - `/pkg/<namespace>/<package-id>/<version>/flows/<flow-id>.agent.md`
+  - `/pkg/<namespace>/<package-id>/<version>/instructions.json`
+  - Optional `?ref=<ref>` on any of the above
 - Short alias (optional `version` query; otherwise `latest` from `versions/manifest.json`):
-  - `/pkg/<namespace>/<package-id>/agents/<agent-id>?ref=<ref>[&version=<semver>]`
-  - `/pkg/<namespace>/<package-id>/flows/<flow-id>?ref=<ref>[&version=<semver>]`
-  - `/pkg/<namespace>/<package-id>/instructions.json?ref=<ref>[&version=<semver>]`
+  - `/pkg/<namespace>/<package-id>/agents/<agent-id>[?ref=<ref>][&version=<semver>]`
+  - `/pkg/<namespace>/<package-id>/flows/<flow-id>[?ref=<ref>][&version=<semver>]`
+  - `/pkg/<namespace>/<package-id>/instructions.json[?ref=<ref>][&version=<semver>]`
 
 Canonical proxy equivalent for the same flow instruction (pinned `1.0.0` at ref `v2.x`):
 
@@ -140,6 +155,10 @@ Canonical proxy equivalent for the same flow instruction (pinned `1.0.0` at ref 
   - `https://<worker>.workers.dev/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0`
 - Canonical:
   - `https://<worker>.workers.dev/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/flows/hello-agents.agent.md`
+
+Example without explicit ref (uses `main`):
+
+- `https://<worker>.workers.dev/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md`
 
 ## Tags listing
 
