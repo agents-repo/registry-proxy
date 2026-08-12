@@ -53,9 +53,10 @@ for shared norms.
    a linked private or advisory tracking issue. Otherwise, reference the
    private security advisory identifier (for example `GHSA-...`) in
    `## Related Issues` and coordinate linkage with maintainers.
-2. **Maintainer emergency hotfix** — Work on a hotfix branch only with prior
-   maintainer approval documented in an issue or advisory. Delivery to `main`
-   is still via merged pull request (no direct push).
+2. **Maintainer emergency hotfix** — Work on a `fix/<issue-number>-<slug>`
+   branch only with prior maintainer approval documented in an issue or
+   advisory. Do not use a separate `hotfix/` prefix. Delivery to `main` is
+   still via merged pull request (no direct push).
 
 ## GitHub Communication Method (Preferred)
 
@@ -113,17 +114,22 @@ PR baseline runs `npm run agents:ci` to reinstall from the committed registry lo
 
 ## Branch Naming
 
-Branch names MUST follow `<prefix>/<issue-number>-<slug>`.
+Branch names MUST follow `<prefix>/<issue-number>-<slug>`, where `<slug>` is
+short lowercase kebab-case. This repository has no normative `specs/` tree—do
+not use `spec/` branches or `spec-change.yml`.
 
-Allowed prefixes:
+| Work type | Prefix | Example |
+| --- | --- | --- |
+| Bug or inconsistency | `fix/` | `fix/42-proxy-cache-mismatch` |
+| Feature proposal | `feat/` | `feat/8-install-package` |
+| Task or chore | `chore/` | `chore/31-sync-workflow-docs` |
+| Documentation-only work | `docs/` | `docs/88-update-pr-guidance` |
 
-- `fix/` for defects
-- `feat/` for features
-- `chore/` for maintenance
-- `docs/` for documentation
+Governance and documentation changes use `docs/` or `chore/` with the matching
+issue form.
 
-Governance and documentation changes use `docs/` or `chore/` with the
-matching issue form. This repository has no separate spec-change form.
+See the organization [branch prefix reference](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#branch-prefix-reference)
+for the canonical cross-repo mapping.
 
 ## Commit Message Convention
 
@@ -149,7 +155,14 @@ Breaking changes should use `!` and include a `BREAKING CHANGE:` footer.
 Before requesting review:
 
 1. Run `npm run env:check`.
-2. Run `npm run lint:all`.
+2. Run `npm run lint:all` (includes `lint:workflows` / actionlint). When bumping
+   `ACTIONLINT_VERSION` in `scripts/lint-workflows.mjs`, replace
+   `scripts/actionlint_<version>_checksums.txt` with the matching file from the
+   [actionlint GitHub release](https://github.com/rhysd/actionlint/releases) and
+   remove the previous version's checksums file. Keep the same pin across
+   organization repositories. See the organization
+   [GitHub Actions workflow linting](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#github-actions-workflow-linting)
+   norm.
 3. Run `npm run check:secrets`.
 4. Run `npm run test`.
 

@@ -59,6 +59,22 @@ If the available tool path cannot programmatically apply a template, the
 agent MUST explicitly state that limitation and MUST include all required
 sections from the intended template in the issue or PR body.
 
+## Branch naming
+
+Branch names MUST follow `<prefix>/<issue-number>-<slug>`, where `<slug>` is
+short lowercase kebab-case. This repository has no normative `specs/` tree—do
+not use `spec/` branches or `spec-change.yml`.
+
+Use the prefix that matches the work category:
+
+- bug or inconsistency: `fix/`
+- feature proposal: `feat/`
+- task or chore: `chore/`
+- documentation-only work: `docs/`
+
+See `.github/CONTRIBUTING.md` **Branch Naming** and the organization
+[branch prefix reference](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#branch-prefix-reference).
+
 ## Guardrails
 
 - Worker must remain read-only unless issue explicitly changes method policy.

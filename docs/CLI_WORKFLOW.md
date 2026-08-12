@@ -2,7 +2,9 @@
 
 This project uses a required issue → branch → push → draft PR workflow with
 GitHub CLI. See `.github/CONTRIBUTING.md` **Required Workflow** for normative
-rules.
+rules and the organization
+[branch prefix reference](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#branch-prefix-reference)
+for prefix mapping.
 
 ## 0. Bootstrap Local Runtime
 
@@ -20,27 +22,36 @@ Continue only when npm resolves to `12.0.1`.
 
 ## 1. Create Issue
 
+Use the matching issue form under `.github/ISSUE_TEMPLATE/` when available.
+
 ```bash
 gh issue create \
-  --title "feat: short description" \
+  --title "fix: short description" \
   --body "Scope, acceptance criteria, and validation plan"
 ```
 
-Use the matching issue form under `.github/ISSUE_TEMPLATE/` when available.
+Match the issue title prefix to the work category (`fix:`, `feat:`, `chore:`,
+`docs:`).
 
 ## 2. Create Branch From Issue Context
+
+Choose `<prefix>` from the issue category (`fix/`, `feat/`, `chore/`, or
+`docs/` for documentation-only work). Examples:
+
+- `fix/42-proxy-cache-mismatch`
+- `docs/88-update-deployment-docs`
 
 Option A:
 
 ```bash
-gh issue develop <issue-number> --name "feat/<issue-number>-<slug>"
+gh issue develop <issue-number> --name "<prefix>/<issue-number>-<slug>"
 ```
 
 Option B:
 
 ```bash
 git checkout main && git pull
-git checkout -b "feat/<issue-number>-<slug>"
+git checkout -b "<prefix>/<issue-number>-<slug>"
 ```
 
 ## 3. Push Branch and Open Draft Pull Request
@@ -55,8 +66,8 @@ git push -u origin HEAD
 
 gh pr create --draft \
   --base main \
-  --head "feat/<issue-number>-<slug>" \
-  --title "feat: short description" \
+  --head "<prefix>/<issue-number>-<slug>" \
+  --title "fix: short description" \
   --body-file .github/pull_request_template.md
 ```
 

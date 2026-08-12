@@ -37,11 +37,9 @@ section of the organization CONTRIBUTING guide.
 
 ## Change Type
 
-- [ ] Feature
-- [ ] Bug fix
-- [ ] Documentation
-- [ ] Tooling or workflow
-- [ ] Maintenance
+- [ ] Feature proposal
+- [ ] Bug or inconsistency
+- [ ] Task or chore
 
 ## Scope
 
