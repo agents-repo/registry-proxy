@@ -30,7 +30,8 @@ gh issue create \
   --body "Scope, acceptance criteria, and validation plan"
 ```
 
-Match the issue title prefix to the work category (`fix:`, `feat:`, `chore:`).
+Match the issue title prefix to the work category (`fix:`, `feat:`, `chore:`,
+`docs:`).
 
 ## 2. Create Branch From Issue Context
 

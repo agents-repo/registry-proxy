@@ -12,11 +12,8 @@ body:
         create your branch and draft PR—do not edit this issue body to add the
         number.
 
-        Documentation-only work may use `docs/<issue-number>-<slug>` instead of
-        `chore/`.
-
-        **Branch pattern:** `chore/<issue-number>-<slug>` (use the assigned number
-        and a short lowercase kebab-case slug from the title)
+        **Branch pattern:** `chore/<issue-number>-<slug>` (or
+        `docs/<issue-number>-<slug>` for documentation-only work)
 
         **Example:** `chore/31-sync-workflow-docs` or
         `docs/88-update-pr-guidance`
