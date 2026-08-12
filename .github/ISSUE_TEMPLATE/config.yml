@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Contributor guide
+    url: https://github.com/agents-repo/registry-proxy/blob/main/.github/CONTRIBUTING.md
+    about: Review the project workflow before opening an issue.
   - name: Registry-proxy usage question
     url: https://github.com/agents-repo/registry-proxy/discussions
     about: Ask usage questions and open-ended discussions here.

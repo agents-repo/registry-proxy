@@ -18,7 +18,8 @@ body:
         **Branch pattern:** `chore/<issue-number>-<slug>` (use the assigned number
         and a short lowercase kebab-case slug from the title)
 
-        **Example:** `chore/31-sync-workflow-docs`
+        **Example:** `chore/31-sync-workflow-docs` or
+        `docs/88-update-pr-guidance`
 
         **Draft PR:** Open with `gh pr create --draft` before implementation
         commits. For standard tasks, use `Closes #<issue-number>` in the PR
