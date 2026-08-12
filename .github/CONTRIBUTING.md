@@ -155,7 +155,14 @@ Breaking changes should use `!` and include a `BREAKING CHANGE:` footer.
 Before requesting review:
 
 1. Run `npm run env:check`.
-2. Run `npm run lint:all`.
+2. Run `npm run lint:all` (includes `lint:workflows` / actionlint). When bumping
+   `ACTIONLINT_VERSION` in `scripts/lint-workflows.mjs`, replace
+   `scripts/actionlint_<version>_checksums.txt` with the matching file from the
+   [actionlint GitHub release](https://github.com/rhysd/actionlint/releases) and
+   remove the previous version's checksums file. Keep the same pin across
+   organization repositories. See the organization
+   [GitHub Actions workflow linting](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#github-actions-workflow-linting)
+   norm.
 3. Run `npm run check:secrets`.
 4. Run `npm run test`.
 

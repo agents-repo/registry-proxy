@@ -47,7 +47,10 @@ For each task, provide:
 Required command baseline:
 
 - `npm run env:check`
-- `npm run lint:all` (includes `lint:workflows` / actionlint on `.github/workflows/`)
+- `npm run lint:all` (includes `lint:workflows` / actionlint on `.github/workflows/`).
+  When bumping `ACTIONLINT_VERSION`, replace
+  `scripts/actionlint_<version>_checksums.txt` with the matching upstream
+  checksums file and remove the previous version's file.
 - `npm run check:secrets`
 - `npm run test`
 
