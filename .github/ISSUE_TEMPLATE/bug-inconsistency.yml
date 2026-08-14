@@ -12,9 +12,9 @@ body:
         create your branch and draft PR—do not edit this issue body to add the
         number.
 
-        Please report vulnerabilities privately with GitHub Private Vulnerability
-        Reporting instead of public GitHub issues, discussions, pull requests, or
-        public social channels (including X and Reddit).
+        Please report vulnerabilities through GitHub Private Vulnerability
+        Reporting instead of GitHub issues, discussions, pull requests, or
+        social channels (including X and Reddit).
         Use https://github.com/agents-repo/registry-proxy/security/advisories/new
         for private disclosure.
 
