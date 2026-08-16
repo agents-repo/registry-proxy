@@ -685,30 +685,66 @@ function clientFileProxyResponse(response, cacheClass) {
   return withCors(response);
 }
 
+function catalogClientFromCache(cached, targetPath) {
+  return withCatalogClientResponse(withResolvedContentType(cached, targetPath));
+}
+
+function isCatalogNotFoundStatus(status) {
+  return status === 404 || status === 410;
+}
+
+function shouldServeStaleCatalog(cacheClass, cached, status) {
+  return cacheClass === "catalog" && Boolean(cached) && status !== 200 && !isCatalogNotFoundStatus(status);
+}
+
+async function readProxyCacheEntry(cache, cacheKey, cacheClass, hasConditionalHeaders, targetPath) {
+  if (hasConditionalHeaders) {
+    return { cached: undefined, freshResponse: null };
+  }
+
+  const matched = await cache.match(cacheKey);
+  if (!matched) {
+    return { cached: undefined, freshResponse: null };
+  }
+
+  if (cacheClass === "catalog") {
+    const cachedAtMs = getCatalogCachedAtMs(matched);
+    if (cachedAtMs !== null && isCatalogEdgeCacheFresh(cachedAtMs)) {
+      return { cached: matched, freshResponse: catalogClientFromCache(matched, targetPath) };
+    }
+
+    return { cached: matched, freshResponse: null };
+  }
+
+  return {
+    cached: matched,
+    freshResponse: clientFileProxyResponse(withResolvedContentType(matched, targetPath), cacheClass),
+  };
+}
+
+function storeSuccessfulFileProxyResponse(ctx, cache, cacheKey, cacheClass, response) {
+  const stored = cacheClass === "catalog"
+    ? buildCatalogStoredResponse(response.clone())
+    : buildFileStoredResponse(withCors(response.clone()));
+  ctx.waitUntil(cache.put(cacheKey, stored));
+}
+
 async function handleProxyRoute(target, env, request, ctx) {
   const cacheClass = classifyProxyCacheClass(target.targetPath);
   const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
-  const upstreamUrl = upstreamRequest.url;
   const hasConditionalHeaders = requestHasConditionalHeaders(request.headers);
-
   const cache = caches.default;
-  const cacheKey = new Request(upstreamUrl, { method: "GET" });
-  let cached;
+  const cacheKey = new Request(upstreamRequest.url, { method: "GET" });
+  const { cached, freshResponse } = await readProxyCacheEntry(
+    cache,
+    cacheKey,
+    cacheClass,
+    hasConditionalHeaders,
+    target.targetPath,
+  );
 
-  if (!hasConditionalHeaders) {
-    const matched = await cache.match(cacheKey);
-    if (matched) {
-      if (cacheClass === "catalog") {
-        const cachedAtMs = getCatalogCachedAtMs(matched);
-        if (cachedAtMs !== null && isCatalogEdgeCacheFresh(cachedAtMs)) {
-          return withCatalogClientResponse(withResolvedContentType(matched, target.targetPath));
-        }
-        cached = matched;
-      } else {
-        const cachedResponse = withResolvedContentType(matched, target.targetPath);
-        return clientFileProxyResponse(cachedResponse, cacheClass);
-      }
-    }
+  if (freshResponse) {
+    return freshResponse;
   }
 
   const upstreamFetchOptions = {
@@ -721,33 +757,28 @@ async function handleProxyRoute(target, env, request, ctx) {
 
   let upstreamResponse;
   try {
-    upstreamResponse = await fetch(upstreamUrl, upstreamFetchOptions);
+    upstreamResponse = await fetch(upstreamRequest.url, upstreamFetchOptions);
   } catch {
     if (cached) {
-      return withCatalogClientResponse(withResolvedContentType(cached, target.targetPath));
+      return catalogClientFromCache(cached, target.targetPath);
     }
 
     return withCors(new Response("Bad Gateway", { status: 502 }));
   }
 
-  if (cacheClass === "catalog" && upstreamResponse.status !== 200 && cached) {
-    return withCatalogClientResponse(withResolvedContentType(cached, target.targetPath));
+  if (shouldServeStaleCatalog(cacheClass, cached, upstreamResponse.status)) {
+    return catalogClientFromCache(cached, target.targetPath);
   }
 
   const responseHeaders = new Headers(upstreamResponse.headers);
-  let response = new Response(upstreamResponse.body, {
+  let response = withResolvedContentType(new Response(upstreamResponse.body, {
     status: upstreamResponse.status,
     statusText: upstreamResponse.statusText,
     headers: responseHeaders,
-  });
-
-  response = withResolvedContentType(response, target.targetPath);
+  }), target.targetPath);
 
   if (upstreamResponse.status === 200) {
-    const stored = cacheClass === "catalog"
-      ? buildCatalogStoredResponse(response.clone())
-      : buildFileStoredResponse(withCors(response.clone()));
-    ctx.waitUntil(cache.put(cacheKey, stored));
+    storeSuccessfulFileProxyResponse(ctx, cache, cacheKey, cacheClass, response);
   }
 
   return clientFileProxyResponse(response, cacheClass);

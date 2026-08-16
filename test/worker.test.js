@@ -882,6 +882,95 @@ test("fetch serves stale catalog cache when upstream fetch fails", async () => {
   }
 });
 
+test("fetch forwards catalog 404 instead of serving stale cache", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/index.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response('{"packages":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response("missing", { status: 404, statusText: "Not Found" });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 404);
+    assert.equal(await response.text(), "missing");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves stale catalog cache when upstream returns 500", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/index.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response('{"packages":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response("upstream error", { status: 500, statusText: "Internal Server Error" });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
+    assert.equal(await response.text(), '{"packages":[]}');
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("fetch sets client Cache-Control for versioned snapshot files without storing it", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;

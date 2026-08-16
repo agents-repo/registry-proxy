@@ -89,7 +89,9 @@ Mutable catalog files use the same 300-second worker TTL pattern as `/tags`:
 
 The worker stores `X-Registry-Proxy-Catalog-Cached-At` on those cached
 responses, re-fetches when that age exceeds `CATALOG_EDGE_TTL_SECONDS` (300),
-and serves the stale cached body when upstream fails. Client responses include
+and serves the stale cached body when upstream is unreachable or returns a
+server error. Upstream `404` and `410` are forwarded so removed catalog files
+do not keep appearing as HTTP 200. Client responses include
 `Cache-Control: public, max-age=300`. Cached `cache.put` entries omit
 `Cache-Control`.
 
