@@ -178,6 +178,14 @@ Before requesting review:
 3. Run `npm run check:secrets`.
 4. Run `npm run test`.
 
+SonarQube Cloud Automatic Analysis reads `.sonarcloud.properties`, not
+`sonar-project.properties` (that filename is ignored while Automatic Analysis
+is on). `sonar.sources` and `sonar.tests` must be disjoint directory lists (no
+wildcards). Do not set `sonar.sources` to `.` while `sonar.tests` lists nested
+directories; analysis fails with “Source and test paths overlap”. This
+repository sets `sonar.sources=src,scripts,docs` and `sonar.tests=test`.
+Coverage report paths are unsupported under Automatic Analysis.
+
 ## Security Rules
 
 - Do not commit credentials or tokens.
