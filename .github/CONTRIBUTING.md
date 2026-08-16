@@ -4,6 +4,18 @@
 
 This repository is a Cloudflare Worker proxy and governance baseline for registry access. Contributions should prioritize deterministic behavior, operational safety, and clear documentation.
 
+## Docs and repository pages
+
+For user guides and cross-repo documentation, see
+[agents-repo.org/docs/](https://agents-repo.org/docs/).
+For this repository's overview on the public site, see
+[agents-repo.org/repositories/registry-proxy/](https://agents-repo.org/repositories/registry-proxy/).
+
+When you change a user-facing or contributor workflow in this
+repository, update the corresponding page(s) in
+[agents-repo/webapp](https://github.com/agents-repo/webapp) under
+`src/content/docs/` in the same PR or an immediate follow-up.
+
 ## Before You Start
 
 1. Open an issue with a matching issue form under `.github/ISSUE_TEMPLATE/`.

@@ -213,6 +213,18 @@ Example:
 - [docs/CLI_WORKFLOW.md](docs/CLI_WORKFLOW.md)
 - [docs/AI_GUIDELINES.md](docs/AI_GUIDELINES.md)
 
+## Docs and repository pages
+
+For user guides and cross-repo documentation, see
+[agents-repo.org/docs/](https://agents-repo.org/docs/).
+For this repository's overview on the public site, see
+[agents-repo.org/repositories/registry-proxy/](https://agents-repo.org/repositories/registry-proxy/).
+
+When you change a user-facing or contributor workflow in this
+repository, update the corresponding page(s) in
+[agents-repo/webapp](https://github.com/agents-repo/webapp) under
+`src/content/docs/` in the same PR or an immediate follow-up.
+
 ## Governance Index
 
 - Issue forms: `.github/ISSUE_TEMPLATE/`
