@@ -1,14 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker, {
+  buildCatalogStoredResponse,
   buildContentsApiUrl,
   buildTagsApiUrl,
   buildTagsCacheKey,
   buildTagsCacheResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
+  CATALOG_CACHED_AT_HEADER,
+  CATALOG_EDGE_TTL_SECONDS,
+  classifyProxyCacheClass,
   encodeRef,
   getProxyTarget,
+  isCatalogEdgeCacheFresh,
   isLegacyFlatPackagePath,
   isTagsEdgeCacheFresh,
   normalizePath,
@@ -18,6 +23,7 @@ import worker, {
   TAGS_CACHED_AT_HEADER,
   TAGS_EDGE_TTL_SECONDS,
   UPSTREAM_USER_AGENT,
+  VERSIONED_CLIENT_TTL_SECONDS,
 } from "../src/worker.js";
 
 test("getProxyTarget resolves tags listing route", () => {
@@ -221,6 +227,33 @@ test("isTagsEdgeCacheFresh respects TTL boundary", () => {
   assert.equal(isTagsEdgeCacheFresh(nowMs - TAGS_EDGE_TTL_SECONDS * 1000, nowMs), true);
   assert.equal(isTagsEdgeCacheFresh(nowMs - (TAGS_EDGE_TTL_SECONDS * 1000 + 1), nowMs), false);
   assert.equal(isTagsEdgeCacheFresh(nowMs + 1, nowMs), false);
+});
+
+test("classifyProxyCacheClass distinguishes catalog, versioned, and other paths", () => {
+  assert.equal(classifyProxyCacheClass("packages/index.json"), "catalog");
+  assert.equal(classifyProxyCacheClass("packages/tree.json"), "catalog");
+  assert.equal(classifyProxyCacheClass("packages/agents-repo/hello-agent/detail.json"), "catalog");
+  assert.equal(
+    classifyProxyCacheClass("packages/agents-repo/hello-agent/versions/1.0.1/README.md"),
+    "versioned",
+  );
+  assert.equal(
+    classifyProxyCacheClass("packages/agents-repo/hello-agent/versions/1.0.1/agents/hello-agent.agent.md"),
+    "versioned",
+  );
+  assert.equal(
+    classifyProxyCacheClass("packages/agents-repo/hello-agent/versions/manifest.json"),
+    "other",
+  );
+  assert.equal(classifyProxyCacheClass("README.md"), "other");
+});
+
+test("isCatalogEdgeCacheFresh respects TTL boundary", () => {
+  const nowMs = 1_700_000_000_000;
+  assert.equal(isCatalogEdgeCacheFresh(nowMs, nowMs), true);
+  assert.equal(isCatalogEdgeCacheFresh(nowMs - CATALOG_EDGE_TTL_SECONDS * 1000, nowMs), true);
+  assert.equal(isCatalogEdgeCacheFresh(nowMs - (CATALOG_EDGE_TTL_SECONDS * 1000 + 1), nowMs), false);
+  assert.equal(isCatalogEdgeCacheFresh(nowMs + 1, nowMs), false);
 });
 
 test("fetch serves stale tags cache when upstream fetch fails", async () => {
@@ -636,7 +669,7 @@ test("fetch returns cached response when cache key exists", async () => {
       throw new Error("fetch should not be called on cache hit");
     };
 
-    const response = await worker.fetch(new Request("https://worker.example/main/packages/index.json"), {}, { waitUntil() {} });
+    const response = await worker.fetch(new Request("https://worker.example/main/README.md"), {}, { waitUntil() {} });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
     assert.equal(await response.text(), "cached");
@@ -716,17 +749,321 @@ test("fetch caches upstream 200 on miss and serves subsequent hit", async () => 
     const firstResponse = await worker.fetch(request, {}, ctx);
     assert.equal(firstResponse.status, 200);
     assert.equal(firstResponse.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(firstResponse.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
     assert.equal(await firstResponse.text(), "upstream");
     assert.equal(fetchCount, 1);
     assert.equal(waitUntilPromises.length, 1);
     await Promise.all(waitUntilPromises);
     assert.equal(cacheWrites.length, 1);
+    const stored = cacheStore.get(cacheWrites[0]);
+    assert.equal(stored.headers.get("Cache-Control"), null);
+    assert.ok(stored.headers.get(CATALOG_CACHED_AT_HEADER));
 
     const secondResponse = await worker.fetch(request, {}, ctx);
     assert.equal(secondResponse.status, 200);
     assert.equal(secondResponse.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(secondResponse.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
     assert.equal(await secondResponse.text(), "upstream");
     assert.equal(fetchCount, 1);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch re-fetches catalog files after edge TTL expires", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const waitUntilPromises = [];
+    let fetchCount = 0;
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put(request, response) {
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response(fetchCount === 1 ? "first" : "second", {
+        status: 200,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    };
+
+    const request = new Request("https://worker.example/packages/agents-repo/hello-agent/detail.json");
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    };
+
+    const firstResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(await firstResponse.text(), "first");
+    await Promise.all(waitUntilPromises);
+
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/agents-repo/hello-agent/detail.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response("first", {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    const secondResponse = await worker.fetch(request, {}, { waitUntil() {} });
+    assert.equal(secondResponse.status, 200);
+    assert.equal(secondResponse.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
+    assert.equal(await secondResponse.text(), "second");
+    assert.equal(fetchCount, 2);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves stale catalog cache when upstream fetch fails", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/index.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response('{"packages":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => {
+      throw new Error("catalog_upstream_fetch_failed");
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
+    assert.equal(await response.text(), '{"packages":[]}');
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch forwards catalog 404 instead of serving stale cache", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/index.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response('{"packages":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response("missing", { status: 404, statusText: "Not Found" });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 404);
+    assert.equal(await response.text(), "missing");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves stale catalog cache when upstream returns 500", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/index.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response('{"packages":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response("upstream error", { status: 500, statusText: "Internal Server Error" });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
+    assert.equal(await response.text(), '{"packages":[]}');
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch serves stale catalog cache when upstream returns 403", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/index.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response('{"packages":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response("forbidden", { status: 403, statusText: "Forbidden" });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
+    assert.equal(await response.text(), '{"packages":[]}');
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch sets client Cache-Control for versioned snapshot files without storing it", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const cacheWrites = [];
+    const waitUntilPromises = [];
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put(request, response) {
+          cacheWrites.push(request.url);
+          cacheStore.set(request.url, response);
+        },
+      },
+    };
+
+    globalThis.fetch = async () => new Response("# readme\n", {
+      status: 200,
+      headers: { "content-type": "text/markdown; charset=utf-8" },
+    });
+
+    const request = new Request(
+      "https://worker.example/main/packages/agents-repo/hello-agent/versions/1.0.1/README.md",
+    );
+    const ctx = {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    };
+
+    const firstResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(firstResponse.status, 200);
+    assert.equal(firstResponse.headers.get("Cache-Control"), `public, max-age=${VERSIONED_CLIENT_TTL_SECONDS}`);
+    assert.equal(await firstResponse.text(), "# readme\n");
+    await Promise.all(waitUntilPromises);
+    assert.equal(cacheWrites.length, 1);
+    assert.equal(cacheStore.get(cacheWrites[0]).headers.get("Cache-Control"), null);
+
+    const secondResponse = await worker.fetch(request, {}, ctx);
+    assert.equal(secondResponse.status, 200);
+    assert.equal(secondResponse.headers.get("Cache-Control"), `public, max-age=${VERSIONED_CLIENT_TTL_SECONDS}`);
+    assert.equal(await secondResponse.text(), "# readme\n");
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;

@@ -79,6 +79,30 @@ When the extension is not in the table above:
   TTL check.
 - Path-style routes such as `/main/tags` remain file proxy requests, not tag listing
 
+## Catalog and versioned file cache
+
+Mutable catalog files use the same 300-second worker TTL pattern as `/tags`:
+
+- `packages/index.json`
+- `packages/tree.json`
+- `packages/<namespace>/<package-id>/detail.json`
+
+The worker stores `X-Registry-Proxy-Catalog-Cached-At` on those cached
+responses, re-fetches when that age exceeds `CATALOG_EDGE_TTL_SECONDS` (300),
+and serves the stale cached body when upstream is unreachable or returns any
+non-200 status except `404` and `410` (for example `403`, `429`, or `5xx`).
+Upstream `404` and `410` are forwarded so removed catalog files
+do not keep appearing as HTTP 200. Client responses include
+`Cache-Control: public, max-age=300`. Cached `cache.put` entries omit
+`Cache-Control`.
+
+Immutable version snapshot paths (`packages/<namespace>/<package-id>/versions/<semver>/...`)
+keep unbounded edge cache. Client responses include
+`Cache-Control: public, max-age=300`; stored cache entries omit `Cache-Control`.
+
+Other file-proxy paths keep unbounded edge cache without worker TTL or client
+`Cache-Control`.
+
 ## Pkg alias routes
 
 - Incoming paths MUST start with `/pkg/` and use optional query `ref` only (no `/<ref>/pkg/...` in MVP).
@@ -105,5 +129,10 @@ When the extension is not in the table above:
 
 ## Known Limitations
 
-- File proxy responses use Cloudflare edge cache without worker-enforced TTL (tags listing is the exception; see **Tags Listing**).
+- File-proxy paths other than catalog files (`packages/index.json`,
+  `packages/tree.json`, `packages/*/detail.json`) and versioned snapshot files
+  use Cloudflare edge cache without worker-enforced TTL. Catalog files use a
+  300-second worker TTL; versioned snapshot files stay unbounded at the edge
+  and send client `Cache-Control: max-age=300`. See **Catalog and versioned
+  file cache**.
 - No write operations are supported.
