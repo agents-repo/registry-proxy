@@ -9,9 +9,9 @@ const TAGS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAM
 const TAGS_API_PAGE_SIZE = 100;
 const TAGS_EDGE_TTL_SECONDS = 300;
 const TAGS_CACHED_AT_HEADER = "X-Registry-Proxy-Tags-Cached-At";
-const CATALOG_EDGE_TTL_SECONDS = 300;
+const CATALOG_EDGE_TTL_SECONDS = TAGS_EDGE_TTL_SECONDS;
 const CATALOG_CACHED_AT_HEADER = "X-Registry-Proxy-Catalog-Cached-At";
-const VERSIONED_CLIENT_TTL_SECONDS = 300;
+const VERSIONED_CLIENT_TTL_SECONDS = TAGS_EDGE_TTL_SECONDS;
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 const CORS_ALLOW_ORIGIN = "*";
@@ -759,7 +759,7 @@ async function handleProxyRoute(target, env, request, ctx) {
   try {
     upstreamResponse = await fetch(upstreamRequest.url, upstreamFetchOptions);
   } catch {
-    if (cached) {
+    if (cacheClass === "catalog" && cached) {
       return catalogClientFromCache(cached, target.targetPath);
     }
 

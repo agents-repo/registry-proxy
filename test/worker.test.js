@@ -971,6 +971,51 @@ test("fetch serves stale catalog cache when upstream returns 500", async () => {
   }
 });
 
+test("fetch serves stale catalog cache when upstream returns 403", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+
+  try {
+    const cacheStore = new Map();
+    const staleCachedAtMs = Date.now() - (CATALOG_EDGE_TTL_SECONDS + 1) * 1000;
+    const cacheKeyUrl = buildUpstreamUrl("main", "packages/index.json");
+    cacheStore.set(
+      cacheKeyUrl,
+      buildCatalogStoredResponse(
+        new Response('{"packages":[]}', {
+          status: 200,
+          headers: { "content-type": "application/json; charset=utf-8" },
+        }),
+        staleCachedAtMs,
+      ),
+    );
+
+    globalThis.caches = {
+      default: {
+        async match(request) {
+          const cached = cacheStore.get(request.url);
+          return cached ? cached.clone() : undefined;
+        },
+        async put() {},
+      },
+    };
+
+    globalThis.fetch = async () => new Response("forbidden", { status: 403, statusText: "Forbidden" });
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("Cache-Control"), `public, max-age=${CATALOG_EDGE_TTL_SECONDS}`);
+    assert.equal(await response.text(), '{"packages":[]}');
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("fetch sets client Cache-Control for versioned snapshot files without storing it", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
