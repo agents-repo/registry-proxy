@@ -6,8 +6,10 @@ This repository is a Cloudflare Worker proxy and governance baseline for registr
 
 ## Docs and repository pages
 
-For user guides and cross-repo documentation, see [agents-repo.org/docs](https://agents-repo.org/docs/).
-For this repository's overview on the public site, see [agents-repo.org/repositories/registry-proxy](https://agents-repo.org/repositories/registry-proxy).
+For user guides and cross-repo documentation, see
+[agents-repo.org/docs/](https://agents-repo.org/docs/).
+For this repository's overview on the public site, see
+[agents-repo.org/repositories/registry-proxy/](https://agents-repo.org/repositories/registry-proxy/).
 
 When you change a user-facing or contributor workflow in this
 repository, update the corresponding page(s) in
