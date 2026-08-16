@@ -9,6 +9,9 @@ const TAGS_API_BASE_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAM
 const TAGS_API_PAGE_SIZE = 100;
 const TAGS_EDGE_TTL_SECONDS = 300;
 const TAGS_CACHED_AT_HEADER = "X-Registry-Proxy-Tags-Cached-At";
+const CATALOG_EDGE_TTL_SECONDS = 300;
+const CATALOG_CACHED_AT_HEADER = "X-Registry-Proxy-Catalog-Cached-At";
+const VERSIONED_CLIENT_TTL_SECONDS = 300;
 const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 const CORS_ALLOW_ORIGIN = "*";
@@ -403,12 +406,95 @@ function getTagsCachedAtMs(response) {
   return Number.isFinite(parsedValue) ? parsedValue : null;
 }
 
-function isTagsEdgeCacheFresh(cachedAtMs, nowMs = Date.now()) {
+function isEdgeCacheFresh(cachedAtMs, ttlSeconds, nowMs = Date.now()) {
   if (cachedAtMs > nowMs) {
     return false;
   }
 
-  return nowMs - cachedAtMs <= TAGS_EDGE_TTL_SECONDS * 1000;
+  return nowMs - cachedAtMs <= ttlSeconds * 1000;
+}
+
+function isTagsEdgeCacheFresh(cachedAtMs, nowMs = Date.now()) {
+  return isEdgeCacheFresh(cachedAtMs, TAGS_EDGE_TTL_SECONDS, nowMs);
+}
+
+function isCatalogEdgeCacheFresh(cachedAtMs, nowMs = Date.now()) {
+  return isEdgeCacheFresh(cachedAtMs, CATALOG_EDGE_TTL_SECONDS, nowMs);
+}
+
+function classifyProxyCacheClass(targetPath) {
+  if (targetPath === "packages/index.json" || targetPath === "packages/tree.json") {
+    return "catalog";
+  }
+
+  const segments = targetPath.split("/").filter(Boolean);
+  if (segments.length === 4 && segments[0] === "packages" && segments[3] === "detail.json") {
+    return "catalog";
+  }
+
+  if (
+    segments.length >= 5 &&
+    segments[0] === "packages" &&
+    segments[3] === "versions" &&
+    isSafePackageVersion(segments[4])
+  ) {
+    return "versioned";
+  }
+
+  return "other";
+}
+
+function getCatalogCachedAtMs(response) {
+  const rawValue = response.headers.get(CATALOG_CACHED_AT_HEADER);
+  if (!rawValue) {
+    return null;
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10);
+  return Number.isFinite(parsedValue) ? parsedValue : null;
+}
+
+function withClientCacheControl(response, maxAgeSeconds) {
+  const headers = new Headers(response.headers);
+  headers.set("Access-Control-Allow-Origin", CORS_ALLOW_ORIGIN);
+  headers.set("Cache-Control", `public, max-age=${maxAgeSeconds}`);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function withCatalogClientResponse(response) {
+  return withClientCacheControl(response, CATALOG_EDGE_TTL_SECONDS);
+}
+
+function withVersionedClientResponse(response) {
+  return withClientCacheControl(response, VERSIONED_CLIENT_TTL_SECONDS);
+}
+
+function buildCatalogStoredResponse(response, cachedAtMs = Date.now()) {
+  const headers = new Headers(response.headers);
+  headers.delete("Cache-Control");
+  headers.set(CATALOG_CACHED_AT_HEADER, String(cachedAtMs));
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function buildFileStoredResponse(response) {
+  const headers = new Headers(response.headers);
+  headers.delete("Cache-Control");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 function buildTagsCacheResponse(tags, cachedAtMs = Date.now()) {
@@ -477,11 +563,16 @@ export {
   buildTagsApiUrl,
   buildTagsCacheKey,
   buildTagsCacheResponse,
+  buildCatalogStoredResponse,
   buildUpstreamRequest,
   buildUpstreamUrl,
   encodeRef,
   getProxyTarget,
   getTagsCachedAtMs,
+  CATALOG_CACHED_AT_HEADER,
+  CATALOG_EDGE_TTL_SECONDS,
+  classifyProxyCacheClass,
+  isCatalogEdgeCacheFresh,
   isLegacyFlatPackagePath,
   isTagsEdgeCacheFresh,
   normalizePath,
@@ -491,6 +582,7 @@ export {
   TAGS_CACHED_AT_HEADER,
   TAGS_EDGE_TTL_SECONDS,
   UPSTREAM_USER_AGENT,
+  VERSIONED_CLIENT_TTL_SECONDS,
 };
 
 async function handleTagsRoute(env, ctx) {
@@ -581,18 +673,41 @@ async function resolvePkgRouteTarget(requestUrl, env, requestHeaders) {
   });
 }
 
+function clientFileProxyResponse(response, cacheClass) {
+  if (cacheClass === "catalog") {
+    return withCatalogClientResponse(response);
+  }
+
+  if (cacheClass === "versioned" && response.status === 200) {
+    return withVersionedClientResponse(response);
+  }
+
+  return withCors(response);
+}
+
 async function handleProxyRoute(target, env, request, ctx) {
+  const cacheClass = classifyProxyCacheClass(target.targetPath);
   const upstreamRequest = buildUpstreamRequest(target, env, request.headers);
   const upstreamUrl = upstreamRequest.url;
   const hasConditionalHeaders = requestHasConditionalHeaders(request.headers);
 
   const cache = caches.default;
   const cacheKey = new Request(upstreamUrl, { method: "GET" });
+  let cached;
+
   if (!hasConditionalHeaders) {
-    const cached = await cache.match(cacheKey);
-    if (cached) {
-      const cachedResponse = withResolvedContentType(cached, target.targetPath);
-      return withCors(cachedResponse);
+    const matched = await cache.match(cacheKey);
+    if (matched) {
+      if (cacheClass === "catalog") {
+        const cachedAtMs = getCatalogCachedAtMs(matched);
+        if (cachedAtMs !== null && isCatalogEdgeCacheFresh(cachedAtMs)) {
+          return withCatalogClientResponse(withResolvedContentType(matched, target.targetPath));
+        }
+        cached = matched;
+      } else {
+        const cachedResponse = withResolvedContentType(matched, target.targetPath);
+        return clientFileProxyResponse(cachedResponse, cacheClass);
+      }
     }
   }
 
@@ -608,7 +723,15 @@ async function handleProxyRoute(target, env, request, ctx) {
   try {
     upstreamResponse = await fetch(upstreamUrl, upstreamFetchOptions);
   } catch {
+    if (cached) {
+      return withCatalogClientResponse(withResolvedContentType(cached, target.targetPath));
+    }
+
     return withCors(new Response("Bad Gateway", { status: 502 }));
+  }
+
+  if (cacheClass === "catalog" && upstreamResponse.status !== 200 && cached) {
+    return withCatalogClientResponse(withResolvedContentType(cached, target.targetPath));
   }
 
   const responseHeaders = new Headers(upstreamResponse.headers);
@@ -620,13 +743,14 @@ async function handleProxyRoute(target, env, request, ctx) {
 
   response = withResolvedContentType(response, target.targetPath);
 
-  const responseWithCors = withCors(response);
-
   if (upstreamResponse.status === 200) {
-    ctx.waitUntil(cache.put(cacheKey, responseWithCors.clone()));
+    const stored = cacheClass === "catalog"
+      ? buildCatalogStoredResponse(response.clone())
+      : buildFileStoredResponse(withCors(response.clone()));
+    ctx.waitUntil(cache.put(cacheKey, stored));
   }
 
-  return responseWithCors;
+  return clientFileProxyResponse(response, cacheClass);
 }
 
 function finishProxyTargetResponse(target, env, request, ctx) {
