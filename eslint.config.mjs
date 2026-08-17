@@ -7,7 +7,6 @@ export default [
       "node_modules/**",
       ".git/**",
       "coverage/**",
-      "scripts/slides.mjs",
     ],
   },
   {

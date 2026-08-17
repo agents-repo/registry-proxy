@@ -4,6 +4,8 @@ theme: agents-repo
 paginate: true
 ---
 
+<!-- markdownlint-disable-file MD025 -->
+
 <!-- _class: title -->
 
 # registry-proxy architecture
