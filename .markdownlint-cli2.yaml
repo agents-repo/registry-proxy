@@ -6,6 +6,7 @@ ignores:
   - ".agents/skills/**"
   - ".claude/agents/**"
   - ".github/agents/**"
+  - "docs/slides/proxy-architecture.md"
 config:
   MD013:
     line_length: 300
