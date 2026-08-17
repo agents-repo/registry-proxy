@@ -147,3 +147,4 @@ vite.config.ts.timestamp-*
 # Wrangler local state (account cache, miniflare state, etc.)
 .wrangler/
 .dev.vars
+docs/slides/build/
