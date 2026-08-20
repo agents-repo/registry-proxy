@@ -25,7 +25,7 @@ Callers (webapp, CLI) avoid hitting GitHub Raw on every request. The Worker is
 
 # Request lifecycle
 
-1. Client hits workers.dev (`/<ref>/<path>`, `/<path>`, or `/pkg/...`)
+1. Client hits `https://registry.agents-repo.org` (`/<ref>/<path>`, `/<path>`, or `/pkg/...`)
 2. Worker maps to GitHub Raw or Contents API
 3. Check `caches.default` by resolved upstream URL
 4. On miss, fetch upstream

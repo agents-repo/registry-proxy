@@ -1,31 +1,78 @@
 # Deployment
 
+Production origin is `https://registry.agents-repo.org` (Custom Domain on the
+Agents Repo Cloudflare account, `account_id` in `wrangler.toml`). Do not treat
+any `*.workers.dev` URL as the catalog origin. Wrangler may still print a
+default `workers.dev` URL on deploy — ignore it in docs and consumer defaults.
+
+The personal `https://registry-proxy.maiconfz.workers.dev` URL remains live for
+existing clients. Do not redirect or decommission it as part of this Worker
+deploy.
+
+There is no staging Worker environment. Live production is
+`https://registry.agents-repo.org` only.
+
 ## Prerequisites
 
-- Cloudflare account with Workers access.
-- Wrangler CLI installed.
-- Authenticated Wrangler session.
-- Optional but recommended: GitHub PAT with read-only permissions for upstream access.
+- Access to the **Agents Repo** Cloudflare account (`3a689fa9c8e3226495626475e5180895`).
+- Wrangler CLI 4.107+ (this repository uses `npx wrangler` after `npm ci`).
+- Authenticated Wrangler **profile** bound to this repository (see below).
+- Optional but recommended: GitHub PAT with read access to `agents-repo/registry`.
+
+Do **not** run `wrangler logout` if a personal Cloudflare login still owns the
+legacy `maiconfz.workers.dev` Worker. Use [Wrangler auth
+profiles](https://developers.cloudflare.com/workers/wrangler/profiles/) so the
+default login can stay personal.
+
+## Wrangler auth profile (Agents Repo)
+
+Wrangler’s default login is one session. A named profile bound to this clone
+targets Agents Repo without dropping the personal session.
+
+```bash
+npx wrangler auth create agents-repo
+npx wrangler auth activate agents-repo "$(pwd)"
+npx wrangler auth list
+npx wrangler whoami
+```
+
+`whoami` from this directory must list account `3a689fa9c8e3226495626475e5180895`.
+If it only lists a personal account, re-run `npx wrangler auth create agents-repo`
+and stop. Do not deploy until this gate passes.
+
+`account_id` in `wrangler.toml` is the failsafe: Wrangler must not fall back to
+a personal account even if the profile can reach both.
+
+One-off override: `npx wrangler deploy --profile agents-repo`. `--profile` is
+not supported on `login`, `logout`, `whoami`, or `auth`.
 
 ## Configure Secret (Optional, Recommended)
 
-Store token in Cloudflare, never in repository files:
+Store the token in Cloudflare, never in repository files. Run from this
+repository directory so the secret lands on the Agents Repo Worker:
 
 ```bash
-wrangler secret put GITHUB_TOKEN
+npx wrangler secret put GITHUB_TOKEN
 ```
 
-The Worker also works without this secret for public upstream content, but authenticated requests are more resilient to upstream rate limits.
+The Worker also works without this secret for public upstream content, but
+authenticated requests are more resilient to upstream rate limits.
 
-Verify the secret is configured for a deployed worker (does not print the token):
+Verify the secret is configured for the deployed worker (does not print the
+token):
 
 ```bash
-wrangler secret list
+npx wrangler secret list
 ```
 
-Expect `GITHUB_TOKEN` in the list for the production worker name.
+Expect `GITHUB_TOKEN` in the list for Worker name `registry-proxy`. If `secret
+put` errors because the script does not exist yet, deploy first, then retry.
 
 ## Deploy
+
+Confirm `wrangler.toml` includes `account_id` and the Custom Domain route for
+`registry.agents-repo.org`. Do not pre-create a `registry` DNS record;
+Wrangler creates it on deploy.
 
 ```bash
 ./scripts/deploy.sh
@@ -34,28 +81,35 @@ Expect `GITHUB_TOKEN` in the list for the production worker name.
 or
 
 ```bash
-wrangler deploy
+npx wrangler deploy
 ```
 
-Capture the generated workers.dev URL.
+Confirm the command targets `3a689fa9c8e3226495626475e5180895`. Ignore any
+printed `*.workers.dev` URL. In the dashboard: Agents Repo → Workers →
+`registry-proxy` → Domains should show `registry.agents-repo.org`.
 
 ## Validate
 
 ```bash
-curl -i "https://<worker>.workers.dev/main/packages/index.json"
-curl -i "https://<worker>.workers.dev/packages/index.json"
-curl -i "https://<worker>.workers.dev/packages/index.json?ref=main"
-curl -i "https://<worker>.workers.dev/README.md"
-curl -i "https://<worker>.workers.dev/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md?ref=main"
-curl -i "https://<worker>.workers.dev/tags"
+curl -i "https://registry.agents-repo.org/packages/index.json"
+curl -i "https://registry.agents-repo.org/packages/index.json?ref=v2.x"
+curl -i "https://registry.agents-repo.org/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md?ref=v2.x"
+curl -i "https://registry.agents-repo.org/tags"
 ```
 
-Confirm `.md` responses include `Content-Type: text/plain; charset=utf-8`.
-Repeat one request to confirm cache reuse behavior.
+Confirm HTTP 200, `Access-Control-Allow-Origin: *`, and `.md` responses include
+`Content-Type: text/plain; charset=utf-8` where applicable. Repeat one request
+to confirm cache reuse.
 
-The webapp uses `/tags` for version-line alias resolution (`v1.x`, `v1.2.x`). Deploy this endpoint before merging dependent webapp changes.
+Also confirm `https://agents-repo.org/` is still the webapp, and
+`https://registry-proxy.maiconfz.workers.dev/packages/index.json?ref=v2.x` still
+returns 200.
+
+The webapp uses `/tags` for version-line alias resolution (`v1.x`, `v1.2.x`).
+Deploy this endpoint before merging dependent webapp changes.
 
 ## Rollback or Redeploy
 
-- Re-run `wrangler deploy` with corrected source.
-- Verify same endpoint set after each deployment.
+- Re-run `npx wrangler deploy` with corrected source from this bound directory.
+- Verify the same Custom Domain endpoint set after each deployment.
+- Do not delete the personal `maiconfz.workers.dev` Worker.
