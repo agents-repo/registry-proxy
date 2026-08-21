@@ -15,7 +15,8 @@ There is no staging Worker environment. Live production is
 ## Prerequisites
 
 - Access to the **Agents Repo** Cloudflare account (`3a689fa9c8e3226495626475e5180895`).
-- Wrangler CLI 4.107+ (this repository uses `npx wrangler` after `npm ci`).
+- Wrangler CLI 4.107+ (this repository uses `npx --ignore-scripts wrangler`
+  after `npm ci` so deploy does not run on-demand package lifecycle scripts).
 - Authenticated Wrangler **profile** bound to this repository (see below).
 - Optional but recommended: GitHub PAT with read access to `agents-repo/registry`.
 
@@ -43,7 +44,7 @@ and stop. Do not deploy until this gate passes.
 `account_id` in `wrangler.toml` is the failsafe: Wrangler must not fall back to
 a personal account even if the profile can reach both.
 
-One-off override: `npx wrangler deploy --profile agents-repo`. `--profile` is
+One-off override: `npx --ignore-scripts wrangler deploy --profile agents-repo`. `--profile` is
 not supported on `login`, `logout`, `whoami`, or `auth`.
 
 ## Configure Secret (Optional, Recommended)
@@ -81,7 +82,7 @@ Wrangler creates it on deploy.
 or
 
 ```bash
-npx wrangler deploy
+npx --ignore-scripts wrangler deploy
 ```
 
 Confirm the command targets `3a689fa9c8e3226495626475e5180895`. Ignore any
@@ -110,6 +111,6 @@ Deploy this endpoint before merging dependent webapp changes.
 
 ## Rollback or Redeploy
 
-- Re-run `npx wrangler deploy` with corrected source from this bound directory.
+- Re-run `npx --ignore-scripts wrangler deploy` with corrected source from this bound directory.
 - Verify the same Custom Domain endpoint set after each deployment.
 - Do not delete the personal `maiconfz.workers.dev` Worker.

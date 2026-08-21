@@ -121,7 +121,7 @@ Unmapped + `vnd.github.raw` → `application/octet-stream`.
 ```bash
 ./scripts/deploy.sh
 # or
-npx wrangler deploy
+npx --ignore-scripts wrangler deploy
 ```
 
 Then curl `index.json` twice to see cache reuse. See `docs/DEPLOYMENT.md`.

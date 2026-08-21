@@ -107,7 +107,7 @@ branch `main`.
    - `npx wrangler secret put GITHUB_TOKEN`
 3. Deploy:
    - `./scripts/deploy.sh`
-   - or `npx wrangler deploy`
+   - or `npx --ignore-scripts wrangler deploy`
 
 Detailed deployment and validation steps are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
