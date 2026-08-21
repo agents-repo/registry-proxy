@@ -104,10 +104,10 @@ branch `main`.
 
 1. Install Wrangler and authenticate to the Agents Repo Cloudflare account (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 2. Optional but recommended: set a GitHub token secret for higher upstream reliability and rate-limit headroom:
-   - `wrangler secret put GITHUB_TOKEN`
+   - `npx wrangler secret put GITHUB_TOKEN`
 3. Deploy:
    - `./scripts/deploy.sh`
-   - or `wrangler deploy`
+   - or `npx wrangler deploy`
 
 Detailed deployment and validation steps are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
