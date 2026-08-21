@@ -58,7 +58,14 @@ npm run test
 
 ## Overview
 
-This project exposes registry content through a Workers endpoint so web clients do not hit GitHub Raw directly. The Worker is read-only by default (GET only), reduces repeated upstream calls through edge caching, and centralizes token handling in Cloudflare.
+This project exposes registry content through a Workers endpoint so web
+clients do not hit GitHub Raw directly. Production origin is
+`https://registry.agents-repo.org` (Custom Domain on the Agents Repo
+Cloudflare account). The personal
+`https://registry-proxy.maiconfz.workers.dev` URL remains live for existing
+clients. The Worker is read-only by default (GET only), reduces repeated
+upstream calls through edge caching, and centralizes token handling in
+Cloudflare.
 
 Scope is intentionally strict:
 
@@ -95,12 +102,12 @@ branch `main`.
 
 ## Deploy
 
-1. Install Wrangler and authenticate with Cloudflare.
+1. Install Wrangler and authenticate to the Agents Repo Cloudflare account (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 2. Optional but recommended: set a GitHub token secret for higher upstream reliability and rate-limit headroom:
-   - `wrangler secret put GITHUB_TOKEN`
+   - `npx wrangler secret put GITHUB_TOKEN`
 3. Deploy:
    - `./scripts/deploy.sh`
-   - or `wrangler deploy`
+   - or `npx --ignore-scripts wrangler deploy`
 
 Detailed deployment and validation steps are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -108,25 +115,25 @@ Detailed deployment and validation steps are in [docs/DEPLOYMENT.md](docs/DEPLOY
 
 Worker URL pattern:
 
-- `https://<worker>.workers.dev/<ref>/<path>`
-- `https://<worker>.workers.dev/<path>` (defaults to ref `main`)
-- `https://<worker>.workers.dev/<path>?ref=<ref>`
+- `https://registry.agents-repo.org/<ref>/<path>`
+- `https://registry.agents-repo.org/<path>` (defaults to ref `main`)
+- `https://registry.agents-repo.org/<path>?ref=<ref>`
 
 Examples:
 
 - Main branch:
-  - `https://<worker>.workers.dev/main/packages/index.json`
-  - `https://<worker>.workers.dev/packages/index.json`
-  - `https://<worker>.workers.dev/packages/index.json?ref=main`
-  - `https://<worker>.workers.dev/README.md`
+  - `https://registry.agents-repo.org/main/packages/index.json`
+  - `https://registry.agents-repo.org/packages/index.json`
+  - `https://registry.agents-repo.org/packages/index.json?ref=main`
+  - `https://registry.agents-repo.org/README.md`
 - Named branch:
-  - `https://<worker>.workers.dev/packages/index.json?ref=release-2026-06`
+  - `https://registry.agents-repo.org/packages/index.json?ref=release-2026-06`
 - Tag:
-  - `https://<worker>.workers.dev/packages/index.json?ref=v2.0.0`
+  - `https://registry.agents-repo.org/packages/index.json?ref=v2.0.0`
 - Namespaced package artifact (v2+ layout):
-  - `https://<worker>.workers.dev/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip`
+  - `https://registry.agents-repo.org/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip`
 - Commit SHA:
-  - `https://<worker>.workers.dev/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f`
+  - `https://registry.agents-repo.org/packages/index.json?ref=d34db33fd34db33fd34db33fd34db33fd34db33f`
 
 ## `/pkg/` chat instruction aliases
 
@@ -151,13 +158,13 @@ Supported shapes:
 Canonical proxy equivalent for the same flow instruction (pinned `1.0.0` at ref `v2.x`):
 
 - Alias:
-  - `https://<worker>.workers.dev/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0`
+  - `https://registry.agents-repo.org/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0`
 - Canonical:
-  - `https://<worker>.workers.dev/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/flows/hello-agents.agent.md`
+  - `https://registry.agents-repo.org/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/flows/hello-agents.agent.md`
 
 Example without explicit ref (uses `main`):
 
-- `https://<worker>.workers.dev/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md`
+- `https://registry.agents-repo.org/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md`
 
 ## Tags listing
 
@@ -171,7 +178,7 @@ Example without explicit ref (uses `main`):
 Example:
 
 ```bash
-curl -s "https://<worker>.workers.dev/tags"
+curl -s "https://registry.agents-repo.org/tags"
 ```
 
 Notes:
@@ -194,14 +201,14 @@ Notes:
 
 ## Use in Webapp
 
-Point your client to your workers.dev URL and include a ref using one of the supported formats:
+Point your client to `https://registry.agents-repo.org` and include a ref using one of the supported formats:
 
 - `/main/packages/index.json`
 - `/packages/index.json?ref=main`
 
 Example:
 
-- `https://<worker>.workers.dev/main/packages/index.json`
+- `https://registry.agents-repo.org/main/packages/index.json`
 
 ## Project Docs
 

@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-wrangler deploy
+npx --ignore-scripts wrangler deploy

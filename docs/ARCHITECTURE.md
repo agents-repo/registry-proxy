@@ -6,7 +6,7 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 
 ## Request Lifecycle
 
-1. Client requests a registry path on workers.dev, or `GET /tags` for tag listing.
+1. Client requests a registry path on `https://registry.agents-repo.org`, or `GET /tags` for tag listing.
 2. Worker normalizes the path and builds the upstream URL (file content or tags API).
 3. Worker checks `caches.default` by resolved upstream URL.
 4. On miss, Worker fetches GitHub Raw when no token is present, or GitHub Contents API with `Accept: application/vnd.github.raw` when `GITHUB_TOKEN` is present. Tag listing always uses the GitHub tags API with optional token auth.
