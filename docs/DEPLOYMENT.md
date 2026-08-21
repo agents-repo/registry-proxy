@@ -2,12 +2,19 @@
 
 Production origin is `https://registry.agents-repo.org` (Custom Domain on the
 Agents Repo Cloudflare account, `account_id` in `wrangler.toml`). Do not treat
-any `*.workers.dev` URL as the catalog origin. Wrangler may still print a
-default `workers.dev` URL on deploy — ignore it in docs and consumer defaults.
+any `*.workers.dev` URL as the catalog origin.
+
+`wrangler.toml` is the source of truth for Workers Logs, `workers_dev`, and
+preview URLs. Dashboard-only toggles are overwritten on the next
+`wrangler deploy`. This Worker pins `workers_dev = false` and
+`preview_urls = false`, so Agents Repo `registry-proxy` must not expose a
+`*.workers.dev` or version-preview route after deploy. Wrangler may still print
+a default `workers.dev` URL on deploy — ignore it in docs and consumer defaults.
 
 The personal `https://registry-proxy.maiconfz.workers.dev` URL remains live for
 existing clients. Do not redirect or decommission it as part of this Worker
-deploy.
+deploy. That Worker is on a different Cloudflare account and is not controlled
+by this repository's `wrangler.toml`.
 
 There is no staging Worker environment. Live production is
 `https://registry.agents-repo.org` only.
@@ -71,9 +78,11 @@ put` errors because the script does not exist yet, deploy first, then retry.
 
 ## Deploy
 
-Confirm `wrangler.toml` includes `account_id` and the Custom Domain route for
-`registry.agents-repo.org`. Do not pre-create a `registry` DNS record;
-Wrangler creates it on deploy.
+Confirm `wrangler.toml` includes `account_id`, the Custom Domain route for
+`registry.agents-repo.org`, `workers_dev = false`, `preview_urls = false`,
+`upload_source_maps = true`, and `[observability]` / `[observability.logs]`
+enabled with `invocation_logs = true`. Do not pre-create a `registry` DNS
+record; Wrangler creates it on deploy.
 
 ```bash
 ./scripts/deploy.sh
@@ -87,7 +96,9 @@ npx --ignore-scripts wrangler deploy
 
 Confirm the command targets `3a689fa9c8e3226495626475e5180895`. Ignore any
 printed `*.workers.dev` URL. In the dashboard: Agents Repo → Workers →
-`registry-proxy` → Domains should show `registry.agents-repo.org`.
+`registry-proxy` → Domains should show `registry.agents-repo.org` and must not
+list a workers.dev or preview route for this Worker. Observability should show
+invocation logs for `GET https://registry.agents-repo.org/...` after traffic.
 
 ## Validate
 
@@ -114,3 +125,5 @@ Deploy this endpoint before merging dependent webapp changes.
 - Re-run `npx --ignore-scripts wrangler deploy` with corrected source from this bound directory.
 - Verify the same Custom Domain endpoint set after each deployment.
 - Do not delete the personal `maiconfz.workers.dev` Worker.
+- Reverting `workers_dev = false` in `wrangler.toml` can re-enable the Agents
+  Repo workers.dev route on the next deploy.

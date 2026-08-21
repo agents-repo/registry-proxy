@@ -2,7 +2,17 @@ name = "registry-proxy"
 account_id = "3a689fa9c8e3226495626475e5180895"
 main = "src/worker.js"
 compatibility_date = "2026-06-03"
+workers_dev = false
+preview_urls = false
+upload_source_maps = true
 
 [[routes]]
 pattern = "registry.agents-repo.org"
 custom_domain = true
+
+[observability]
+enabled = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
