@@ -29,6 +29,18 @@ test("parseVersionedZipDownload accepts versioned artifact ZIPs", () => {
   );
 });
 
+test("parseVersionedZipDownload accepts uppercase ZIP extensions", () => {
+  assert.deepEqual(
+    parseVersionedZipDownload("packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.ZIP"),
+    {
+      namespace: "agents-repo",
+      packageId: "hello-agent",
+      version: "1.0.0",
+      targetId: "cursor",
+    },
+  );
+});
+
 test("parseVersionedZipDownload rejects non-artifact paths", () => {
   assert.equal(parseVersionedZipDownload("packages/index.json"), null);
   assert.equal(
@@ -41,6 +53,14 @@ test("parseVersionedZipDownload rejects non-artifact paths", () => {
   );
   assert.equal(
     parseVersionedZipDownload("pkg/agents-repo/hello-agent/1.0.0/agents/hello-agent.agent.md"),
+    null,
+  );
+  assert.equal(
+    parseVersionedZipDownload("packages/../hello-agent/versions/1.0.0/1.0.0-cursor.zip"),
+    null,
+  );
+  assert.equal(
+    parseVersionedZipDownload("packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-.zip"),
     null,
   );
 });
@@ -60,6 +80,9 @@ test("parseStatsPath accepts list and package paths", () => {
   });
   assert.equal(parseStatsPath("stats/packages/hello-agent").kind, "invalid");
   assert.equal(parseStatsPath("stats/other").kind, "invalid");
+  assert.equal(parseStatsPath("stats/packages/../hello-agent").kind, "invalid");
+  assert.equal(parseStatsPath("stats/packages/foo%2fbar/hello-agent").kind, "invalid");
+  assert.equal(parseStatsPath("stats/packages/agents-repo/..").kind, "invalid");
 });
 
 test("resolveStatsResult returns 503 without D1", async () => {
@@ -118,7 +141,27 @@ test("resolveStatsResult returns zero downloads for unknown packages", async () 
   });
 });
 
-test("scheduleZipDownloadCount skips non-200 and missing D1", async () => {
+test("resolveStatsResult returns 400 for invalid stats paths", async () => {
+  const result = await resolveStatsResult("stats/other", {
+    DOWNLOADS: createMemoryDownloadsDb(),
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.payload.error, "invalid_stats_path");
+});
+
+test("resolveStatsResult returns 503 when D1 queries throw", async () => {
+  const result = await resolveStatsResult("stats", {
+    DOWNLOADS: {
+      prepare() {
+        throw new Error("d1 unavailable");
+      },
+    },
+  });
+  assert.equal(result.status, 503);
+  assert.equal(result.payload.error, "downloads_unavailable");
+});
+
+test("scheduleZipDownloadCount skips non-200, missing D1, and missing waitUntil", async () => {
   const env = { DOWNLOADS: createMemoryDownloadsDb() };
   const waitUntilPromises = [];
   const ctx = {
@@ -130,6 +173,8 @@ test("scheduleZipDownloadCount skips non-200 and missing D1", async () => {
   scheduleZipDownloadCount(ctx, env, ZIP_PATH, 304);
   scheduleZipDownloadCount(ctx, env, ZIP_PATH, 404);
   scheduleZipDownloadCount(ctx, {}, ZIP_PATH, 200);
+  scheduleZipDownloadCount({}, env, ZIP_PATH, 200);
+  scheduleZipDownloadCount(null, env, ZIP_PATH, 200);
   assert.equal(waitUntilPromises.length, 0);
 
   const listed = await resolveStatsResult("stats", env);

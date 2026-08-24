@@ -116,15 +116,16 @@ export function scheduleZipDownloadCount(ctx, env, targetPath, status) {
     return;
   }
 
+  if (!ctx || typeof ctx.waitUntil !== "function") {
+    return;
+  }
+
   const parsed = parseVersionedZipDownload(targetPath);
   if (!parsed || !env?.DOWNLOADS) {
     return;
   }
 
-  const task = incrementZipDownload(env, parsed).catch(() => {});
-  if (ctx && typeof ctx.waitUntil === "function") {
-    ctx.waitUntil(task);
-  }
+  ctx.waitUntil(incrementZipDownload(env, parsed).catch(() => {}));
 }
 
 async function loadStatsList(env) {

@@ -100,8 +100,9 @@ npx wrangler d1 migrations apply registry-proxy-downloads --remote
 ./scripts/deploy.sh
 ```
 
-If you deploy first, ZIP downloads still succeed (increment no-ops until the
-table exists); `/stats` returns empty or 503 until migrate + bind are in place.
+If you deploy first, ZIP downloads still succeed (increment errors are
+swallowed). `/stats` returns HTTP 503 until the D1 binding and migration are
+in place.
 
 Dashboard check after deploy: Workers → `registry-proxy` → Bindings →
 `DOWNLOADS` → D1 `registry-proxy-downloads`.

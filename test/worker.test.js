@@ -1794,6 +1794,80 @@ test("fetch /stats?ref=v2.x is stats, not a file proxy", async () => {
   }
 });
 
+test("fetch does not increment D1 for /pkg/ 200 responses", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response("# Hello", { status: 200 });
+
+    const pkg = collectingWaitUntil();
+    const response = await worker.fetch(
+      new Request("https://worker.example/pkg/agents-repo/hello-agent/1.0.0/agents/hello-agent.agent.md"),
+      env,
+      pkg.ctx,
+    );
+    assert.equal(response.status, 200);
+    await pkg.flush();
+
+    const stats = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
+    assert.deepEqual(await stats.json(), { packages: [] });
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch ZIP 200 still succeeds when D1 increment throws", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = {
+    DOWNLOADS: {
+      prepare() {
+        throw new Error("d1 unavailable");
+      },
+    },
+  };
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response("zip-bytes", { status: 200 });
+
+    const counting = collectingWaitUntil();
+    const response = await worker.fetch(
+      new Request(`https://worker.example${ZIP_REQUEST_PATH}`),
+      env,
+      counting.ctx,
+    );
+    assert.equal(response.status, 200);
+    await counting.flush();
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch /stats returns 503 when D1 queries throw", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/stats"),
+    {
+      DOWNLOADS: {
+        prepare() {
+          throw new Error("d1 unavailable");
+        },
+      },
+    },
+    { waitUntil() {} },
+  );
+  assert.equal(response.status, 503);
+  const payload = await response.json();
+  assert.equal(payload.error, "downloads_unavailable");
+});
+
 test("fetch /main/stats remains a file proxy", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
