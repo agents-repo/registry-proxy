@@ -19,12 +19,14 @@ import worker, {
   normalizePath,
   normalizeRef,
   splitPathStyle,
+  STATS_CLIENT_TTL_SECONDS,
   TAGS_API_BASE_URL,
   TAGS_CACHED_AT_HEADER,
   TAGS_EDGE_TTL_SECONDS,
   UPSTREAM_USER_AGENT,
   VERSIONED_CLIENT_TTL_SECONDS,
 } from "../src/worker.js";
+import { createMemoryDownloadsDb } from "./memory-downloads-d1.js";
 
 test("getProxyTarget resolves tags listing route", () => {
   assert.deepEqual(getProxyTarget(new URL("https://worker.example/tags")), { kind: "tags" });
@@ -35,6 +37,13 @@ test("getProxyTarget keeps path-style file proxy for ref/tags paths", () => {
   assert.deepEqual(
     getProxyTarget(new URL("https://worker.example/main/tags")),
     { kind: "proxy", ref: "main", targetPath: "tags" },
+  );
+});
+
+test("getProxyTarget keeps path-style file proxy for ref/stats paths", () => {
+  assert.deepEqual(
+    getProxyTarget(new URL("https://worker.example/main/stats")),
+    { kind: "proxy", ref: "main", targetPath: "stats" },
   );
 });
 
@@ -1520,3 +1529,296 @@ test("fetch normalizes plain md json txt and zip content types", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+const ZIP_REQUEST_PATH = "/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip";
+const ZIP_PATH_STYLE = "/v2.x/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip";
+const ZIP_QUERY_REF = `${ZIP_REQUEST_PATH}?ref=v2.x`;
+
+function memoryCache() {
+  const cacheStore = new Map();
+  return {
+    cacheStore,
+    caches: {
+      default: {
+        async match(request) {
+          return cacheStore.get(request.url);
+        },
+        async put(request, response) {
+          cacheStore.set(request.url, response);
+        },
+      },
+    },
+  };
+}
+
+function collectingWaitUntil() {
+  const waitUntilPromises = [];
+  return {
+    waitUntilPromises,
+    ctx: {
+      waitUntil(promise) {
+        waitUntilPromises.push(promise);
+      },
+    },
+    async flush() {
+      await Promise.all(waitUntilPromises);
+    },
+  };
+}
+
+test("fetch increments D1 on ZIP 200 cache miss and cache hit", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response("zip-bytes", {
+      status: 200,
+      headers: { "content-type": "application/zip" },
+    });
+
+    const first = collectingWaitUntil();
+    const missResponse = await worker.fetch(
+      new Request(`https://worker.example${ZIP_REQUEST_PATH}`),
+      env,
+      first.ctx,
+    );
+    assert.equal(missResponse.status, 200);
+    await first.flush();
+
+    const afterMiss = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
+    assert.deepEqual(await afterMiss.json(), {
+      packages: [{ namespace: "agents-repo", package: "hello-agent", downloads: 1 }],
+    });
+
+    const second = collectingWaitUntil();
+    const hitResponse = await worker.fetch(
+      new Request(`https://worker.example${ZIP_REQUEST_PATH}`),
+      env,
+      second.ctx,
+    );
+    assert.equal(hitResponse.status, 200);
+    await second.flush();
+
+    const afterHit = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
+    assert.deepEqual(await afterHit.json(), {
+      packages: [{ namespace: "agents-repo", package: "hello-agent", downloads: 2 }],
+    });
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch counts path-style and query-ref ZIP URLs as the same row", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response("zip-bytes", {
+      status: 200,
+      headers: { "content-type": "application/zip" },
+    });
+
+    const first = collectingWaitUntil();
+    assert.equal(
+      (await worker.fetch(new Request(`https://worker.example${ZIP_PATH_STYLE}`), env, first.ctx)).status,
+      200,
+    );
+    await first.flush();
+
+    const second = collectingWaitUntil();
+    assert.equal(
+      (await worker.fetch(new Request(`https://worker.example${ZIP_QUERY_REF}`), env, second.ctx)).status,
+      200,
+    );
+    await second.flush();
+
+    const stats = await worker.fetch(
+      new Request("https://worker.example/stats/packages/agents-repo/hello-agent"),
+      env,
+      { waitUntil() {} },
+    );
+    assert.equal(stats.status, 200);
+    assert.equal(stats.headers.get("Access-Control-Allow-Origin"), "*");
+    assert.equal(stats.headers.get("Cache-Control"), `public, max-age=${STATS_CLIENT_TTL_SECONDS}`);
+    assert.deepEqual(await stats.json(), {
+      namespace: "agents-repo",
+      package: "hello-agent",
+      downloads: 2,
+      artifacts: [{ version: "1.0.0", target: "cursor", downloads: 2 }],
+    });
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch does not increment D1 on ZIP 304 or 404", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response(null, { status: 304, statusText: "Not Modified" });
+
+    const notModified = collectingWaitUntil();
+    const response304 = await worker.fetch(
+      new Request(`https://worker.example${ZIP_REQUEST_PATH}`, {
+        headers: { "If-None-Match": "\"abc\"" },
+      }),
+      env,
+      notModified.ctx,
+    );
+    assert.equal(response304.status, 304);
+    await notModified.flush();
+
+    globalThis.fetch = async () => new Response("missing", { status: 404, statusText: "Not Found" });
+    const missing = collectingWaitUntil();
+    const response404 = await worker.fetch(
+      new Request(`https://worker.example${ZIP_REQUEST_PATH}`),
+      env,
+      missing.ctx,
+    );
+    assert.equal(response404.status, 404);
+    await missing.flush();
+
+    const stats = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
+    assert.deepEqual(await stats.json(), { packages: [] });
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch does not increment D1 for non-ZIP 200 responses", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response("{}", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+
+    const catalog = collectingWaitUntil();
+    const response = await worker.fetch(
+      new Request("https://worker.example/packages/index.json"),
+      env,
+      catalog.ctx,
+    );
+    assert.equal(response.status, 200);
+    await catalog.flush();
+
+    const stats = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
+    assert.deepEqual(await stats.json(), { packages: [] });
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch ZIP 200 still succeeds when D1 is missing", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response("zip-bytes", { status: 200 });
+
+    const response = await worker.fetch(
+      new Request(`https://worker.example${ZIP_REQUEST_PATH}`),
+      {},
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch /stats without D1 returns 503", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/stats"),
+    {},
+    { waitUntil() {} },
+  );
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");
+  const payload = await response.json();
+  assert.equal(payload.error, "downloads_unavailable");
+});
+
+test("fetch /stats/other returns 400", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/stats/other"),
+    { DOWNLOADS: createMemoryDownloadsDb() },
+    { waitUntil() {} },
+  );
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.equal(payload.error, "invalid_stats_path");
+});
+
+test("fetch /stats?ref=v2.x is stats, not a file proxy", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCount = 0;
+  globalThis.fetch = async () => {
+    fetchCount += 1;
+    return new Response("nope", { status: 200 });
+  };
+
+  try {
+    const response = await worker.fetch(
+      new Request("https://worker.example/stats?ref=v2.x"),
+      { DOWNLOADS: createMemoryDownloadsDb() },
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { packages: [] });
+    assert.equal(fetchCount, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch /main/stats remains a file proxy", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async (url) => {
+      assert.match(String(url), /\/main\/stats$/);
+      return new Response("stats-file", {
+        status: 200,
+        headers: { "content-type": "text/plain" },
+      });
+    };
+
+    const response = await worker.fetch(
+      new Request("https://worker.example/main/stats"),
+      { DOWNLOADS: createMemoryDownloadsDb() },
+      { waitUntil() {} },
+    );
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), "stats-file");
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+

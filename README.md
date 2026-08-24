@@ -6,7 +6,7 @@
 
 ---
 
-Cloudflare Worker proxy for files in the GitHub repository agents-repo/registry only. It forwards read requests to GitHub Raw by default, applies edge caching, and optionally uses the GitHub Contents API with a GitHub token stored as a Cloudflare secret.
+Cloudflare Worker proxy for files in the GitHub repository agents-repo/registry only. It forwards read requests to GitHub Raw by default, applies edge caching, counts successful ZIP downloads in Cloudflare D1, and optionally uses the GitHub Contents API with a GitHub token stored as a Cloudflare secret.
 
 ## Development Environment
 
@@ -76,11 +76,12 @@ Scope is intentionally strict:
 ## How It Works
 
 1. A request hits the Worker endpoint in one of the supported formats:
-   `/<ref>/<path>`, `/<path>`, `/<path>?ref=<ref>`, or `/pkg/...`.
+   `/<ref>/<path>`, `/<path>`, `/<path>?ref=<ref>`, `/pkg/...`, `/tags`, or `/stats`.
 1. The Worker maps the request to upstream content: `https://raw.githubusercontent.com/agents-repo/registry/<ref>/<path>`, or when `GITHUB_TOKEN` is present, `https://api.github.com/repos/agents-repo/registry/contents/<path>?ref=<ref>` with `Accept: application/vnd.github.raw`.
 1. The Worker checks `caches.default` for a cached response.
 1. On cache miss, it fetches upstream without Authorization for GitHub Raw, or with `Authorization: Bearer <GITHUB_TOKEN>` and `Accept: application/vnd.github.raw` for the Contents API.
 1. Successful upstream responses with status 200 are cached and returned to the caller.
+1. HTTP 200 versioned ZIP artifacts increment D1 download counts in the background.
 1. For HTTP 200 file responses, the Worker normalizes `Content-Type` from the
    requested path extension when mapped, and falls back to
    `application/octet-stream` for unmapped extensions served as
@@ -105,7 +106,8 @@ branch `main`.
 1. Install Wrangler and authenticate to the Agents Repo Cloudflare account (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 2. Optional but recommended: set a GitHub token secret for higher upstream reliability and rate-limit headroom:
    - `npx wrangler secret put GITHUB_TOKEN`
-3. Deploy:
+3. Apply D1 migrations before deploy (`npx wrangler d1 migrations apply registry-proxy-downloads --remote`). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+4. Deploy:
    - `./scripts/deploy.sh`
    - or `npx --ignore-scripts wrangler deploy`
 
@@ -179,6 +181,27 @@ Example:
 
 ```bash
 curl -s "https://registry.agents-repo.org/tags"
+```
+
+## Download stats
+
+`GET /stats` returns package download totals counted from successful ZIP GETs
+through this Worker (including cache hits). Counts are stored in Cloudflare D1.
+
+- Root meta route (not `/main/stats` — that is a file path).
+- Query `ref` is ignored: `/stats?ref=v2.x` is still stats.
+- `GET /stats` → `{ "packages": [{ "namespace", "package", "downloads" }] }`
+- `GET /stats/packages/<namespace>/<package-id>` → package total plus per-artifact rows
+- Unknown packages return HTTP 200 with `downloads: 0`
+- Missing D1 returns HTTP 503
+- Responses include CORS `Access-Control-Allow-Origin: *` and
+  `Cache-Control: public, max-age=60`
+
+Example:
+
+```bash
+curl -s "https://registry.agents-repo.org/stats"
+curl -s "https://registry.agents-repo.org/stats/packages/agents-repo/hello-agent"
 ```
 
 Notes:

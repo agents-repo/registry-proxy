@@ -18,18 +18,20 @@ Cached, read-only access to agents-repo/registry
 
 Cloudflare Worker that proxies **only** `agents-repo/registry` files.
 
-Callers (webapp, CLI) avoid hitting GitHub Raw on every request. The Worker is
-**read-only** unless an issue explicitly changes method policy.
+Callers (webapp, CLI) avoid hitting GitHub Raw on every request. HTTP is
+**GET-only** unless an issue explicitly changes method policy. Successful ZIP
+GETs increment D1 as a side-effect.
 
 ---
 
 # Request lifecycle
 
-1. Client hits `https://registry.agents-repo.org` (`/<ref>/<path>`, `/<path>`, or `/pkg/...`)
-2. Worker maps to GitHub Raw or Contents API
+1. Client hits `https://registry.agents-repo.org` (`/<ref>/<path>`, `/<path>`, `/pkg/...`, `/tags`, or `/stats`)
+2. Worker maps to GitHub Raw or Contents API (stats does not proxy)
 3. Check `caches.default` by resolved upstream URL
 4. On miss, fetch upstream
 5. Cache successful 200s and return
+6. HTTP 200 versioned ZIPs increment D1 in `waitUntil`
 
 Details: `docs/ARCHITECTURE.md`.
 
@@ -76,13 +78,25 @@ Webapp uses this for version-line aliases such as `v2.x`. TTL: 300 seconds.
 
 ---
 
+# `GET /stats`
+
+Root meta route (not `/main/stats` — that is a file path). Prefix like `/pkg/`.
+
+- `/stats` — package totals from D1
+- `/stats/packages/<namespace>/<package-id>` — per-artifact rows
+- Increments on HTTP 200 versioned ZIP GETs (cache hit and miss)
+- Missing D1: ZIP still 200; `/stats` is 503
+
+---
+
 # GET-only policy
 
 Supported: `GET`.
 
 Anything else: `405 Method Not Allowed`.
 
-Do not add writes without an explicit issue.
+Do not add HTTP write methods without an explicit issue. D1 increments on ZIP
+GET 200 are a documented side-effect, not a new method.
 
 ---
 
@@ -118,10 +132,11 @@ Unmapped + `vnd.github.raw` → `application/octet-stream`.
 
 # Deploy
 
+Apply D1 migrations first (`wrangler deploy` does not):
+
 ```bash
+npx wrangler d1 migrations apply registry-proxy-downloads --remote
 ./scripts/deploy.sh
-# or
-npx --ignore-scripts wrangler deploy
 ```
 
 Then curl `index.json` twice to see cache reuse. See `docs/DEPLOYMENT.md`.
@@ -148,5 +163,5 @@ Package authoring → registry slides.
 
 # Remember
 
-Read-only Worker. GitHub Raw or Contents API. Cache hit on repeat GET.
-Token never in the repo.
+Read-only HTTP (GET). GitHub Raw or Contents API. Cache hit on repeat GET.
+ZIP 200s increment D1. Token never in the repo.

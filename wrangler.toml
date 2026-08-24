@@ -16,3 +16,9 @@ enabled = true
 [observability.logs]
 enabled = true
 invocation_logs = true
+
+[[d1_databases]]
+binding = "DOWNLOADS"
+database_name = "registry-proxy-downloads"
+database_id = "dc9103bd-ca9f-4ec9-ad90-d75dd48d4622"
+migrations_dir = "migrations"

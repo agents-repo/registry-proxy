@@ -76,13 +76,44 @@ npx wrangler secret list
 Expect `GITHUB_TOKEN` in the list for Worker name `registry-proxy`. If `secret
 put` errors because the script does not exist yet, deploy first, then retry.
 
+## D1 download counts
+
+The Worker binds D1 as `DOWNLOADS` (`registry-proxy-downloads`,
+`database_id` in `wrangler.toml`). Bindings belong in `wrangler.toml`;
+dashboard-only bindings are overwritten on the next `wrangler deploy`.
+
+Create the database once (already done on the Agents Repo account):
+
+```bash
+npx wrangler d1 create registry-proxy-downloads
+```
+
+Copy the printed `database_id` into `wrangler.toml`. Use binding name
+`DOWNLOADS`, not Wrangler’s suggested `registry_proxy_downloads`.
+
+Apply migrations **before** deploying Worker code that reads the table.
+`wrangler deploy` does **not** apply D1 migrations, and `scripts/deploy.sh`
+stays deploy-only:
+
+```bash
+npx wrangler d1 migrations apply registry-proxy-downloads --remote
+./scripts/deploy.sh
+```
+
+If you deploy first, ZIP downloads still succeed (increment no-ops until the
+table exists); `/stats` returns empty or 503 until migrate + bind are in place.
+
+Dashboard check after deploy: Workers → `registry-proxy` → Bindings →
+`DOWNLOADS` → D1 `registry-proxy-downloads`.
+
 ## Deploy
 
 Confirm `wrangler.toml` includes `account_id`, the Custom Domain route for
 `registry.agents-repo.org`, `workers_dev = false`, `preview_urls = false`,
-`upload_source_maps = true`, and `[observability]` / `[observability.logs]`
-enabled with `invocation_logs = true`. Do not pre-create a `registry` DNS
-record; Wrangler creates it on deploy.
+`upload_source_maps = true`, `[observability]` / `[observability.logs]`
+enabled with `invocation_logs = true`, and `[[d1_databases]]` binding
+`DOWNLOADS`. Do not pre-create a `registry` DNS record; Wrangler creates it on
+deploy.
 
 ```bash
 ./scripts/deploy.sh
@@ -107,15 +138,20 @@ curl -i "https://registry.agents-repo.org/packages/index.json"
 curl -i "https://registry.agents-repo.org/packages/index.json?ref=v2.x"
 curl -i "https://registry.agents-repo.org/pkg/agents-repo/hello-agent/1.0.1/agents/hello-agent.agent.md?ref=v2.x"
 curl -i "https://registry.agents-repo.org/tags"
+curl -sI "https://registry.agents-repo.org/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip?ref=v2.x"
+curl -s "https://registry.agents-repo.org/stats/packages/agents-repo/hello-agent"
+curl -s "https://registry.agents-repo.org/stats"
 ```
 
 Confirm HTTP 200, `Access-Control-Allow-Origin: *`, and `.md` responses include
 `Content-Type: text/plain; charset=utf-8` where applicable. Repeat one request
-to confirm cache reuse.
+to confirm cache reuse. After a ZIP `200`, `/stats` should show `downloads >= 1`
+for that package (or the previous total plus one).
 
 Also confirm `https://agents-repo.org/` is still the webapp, and
 `https://registry-proxy.maiconfz.workers.dev/packages/index.json?ref=v2.x` still
-returns 200.
+returns 200. The personal workers.dev Worker is a different Cloudflare account
+and does not share this D1 database.
 
 The webapp uses `/tags` for version-line alias resolution (`v1.x`, `v1.2.x`).
 Deploy this endpoint before merging dependent webapp changes.
