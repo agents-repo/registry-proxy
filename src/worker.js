@@ -1,7 +1,6 @@
 import { resolvePkgProxyTarget, isSafePackageVersion, DEFAULT_REF } from "./pkg-routes.js";
 import { withResolvedContentType } from "./content-type.js";
 import {
-  STATS_CLIENT_TTL_SECONDS,
   resolveStatsResult,
   scheduleZipDownloadCount,
 } from "./download-stats.js";
@@ -567,6 +566,8 @@ export {
   resolvePkgProxyTarget,
 } from "./pkg-routes.js";
 
+export { STATS_CLIENT_TTL_SECONDS } from "./download-stats.js";
+
 export {
   buildContentsApiUrl,
   buildTagsApiUrl,
@@ -592,7 +593,6 @@ export {
   TAGS_EDGE_TTL_SECONDS,
   UPSTREAM_USER_AGENT,
   VERSIONED_CLIENT_TTL_SECONDS,
-  STATS_CLIENT_TTL_SECONDS,
 };
 
 async function handleTagsRoute(env, ctx) {
