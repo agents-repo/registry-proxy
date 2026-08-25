@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   parseStatsPath,
+  parseStatsPeriod,
   parseVersionedZipDownload,
   resolveStatsResult,
   scheduleZipDownloadCount,
@@ -10,6 +11,23 @@ import {
 import { createMemoryDownloadsDb } from "./memory-downloads-d1.js";
 
 const ZIP_PATH = "packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip";
+
+function windows(count) {
+  return {
+    downloads: count,
+    downloads_7d: count,
+    downloads_30d: count,
+    downloads_365d: count,
+  };
+}
+
+function packageWindows(namespace, packageId, count) {
+  return {
+    namespace,
+    package: packageId,
+    ...windows(count),
+  };
+}
 
 test("parseVersionedZipDownload accepts versioned artifact ZIPs", () => {
   assert.deepEqual(parseVersionedZipDownload(ZIP_PATH), {
@@ -85,6 +103,16 @@ test("parseStatsPath accepts list and package paths", () => {
   assert.equal(parseStatsPath("stats/packages/agents-repo/..").kind, "invalid");
 });
 
+test("parseStatsPeriod accepts omitted all 7d 30d and 365d", () => {
+  assert.deepEqual(parseStatsPeriod(new URLSearchParams()), { ok: true, period: "all" });
+  assert.deepEqual(parseStatsPeriod(new URLSearchParams("period=all")), { ok: true, period: "all" });
+  assert.deepEqual(parseStatsPeriod(new URLSearchParams("period=7d")), { ok: true, period: "7d" });
+  assert.deepEqual(parseStatsPeriod(new URLSearchParams("period=30d")), { ok: true, period: "30d" });
+  assert.deepEqual(parseStatsPeriod(new URLSearchParams("period=365d")), { ok: true, period: "365d" });
+  assert.deepEqual(parseStatsPeriod(new URLSearchParams("ref=v2.x")), { ok: true, period: "all" });
+  assert.equal(parseStatsPeriod(new URLSearchParams("period=today")).ok, false);
+});
+
 test("resolveStatsResult returns 503 without D1", async () => {
   const result = await resolveStatsResult("stats", {});
   assert.equal(result.status, 503);
@@ -114,16 +142,14 @@ test("resolveStatsResult lists packages sorted by downloads", async () => {
   assert.equal(listed.status, 200);
   assert.equal(listed.cacheControl, `public, max-age=${STATS_CLIENT_TTL_SECONDS}`);
   assert.deepEqual(listed.payload.packages, [
-    { namespace: "agents-repo", package: "hello-agent", downloads: 2 },
-    { namespace: "other-ns", package: "other-pkg", downloads: 1 },
+    packageWindows("agents-repo", "hello-agent", 2),
+    packageWindows("other-ns", "other-pkg", 1),
   ]);
 
   const detail = await resolveStatsResult("stats/packages/agents-repo/hello-agent", env);
   assert.equal(detail.status, 200);
   assert.deepEqual(detail.payload, {
-    namespace: "agents-repo",
-    package: "hello-agent",
-    downloads: 2,
+    ...packageWindows("agents-repo", "hello-agent", 2),
     artifacts: [{ version: "1.0.0", target: "cursor", downloads: 2 }],
   });
 });
@@ -134,9 +160,7 @@ test("resolveStatsResult returns zero downloads for unknown packages", async () 
   });
   assert.equal(result.status, 200);
   assert.deepEqual(result.payload, {
-    namespace: "agents-repo",
-    package: "missing",
-    downloads: 0,
+    ...packageWindows("agents-repo", "missing", 0),
     artifacts: [],
   });
 });
@@ -147,6 +171,60 @@ test("resolveStatsResult returns 400 for invalid stats paths", async () => {
   });
   assert.equal(result.status, 400);
   assert.equal(result.payload.error, "invalid_stats_path");
+});
+
+test("resolveStatsResult returns 400 for unknown period", async () => {
+  const result = await resolveStatsResult("stats", {
+    DOWNLOADS: createMemoryDownloadsDb(),
+  }, new URLSearchParams("period=today"));
+  assert.equal(result.status, 400);
+  assert.equal(result.payload.error, "invalid_stats_period");
+});
+
+test("resolveStatsResult orders the list by the requested period", async () => {
+  const env = { DOWNLOADS: createMemoryDownloadsDb({ now: "2026-08-25 12:00:00" }) };
+  env.DOWNLOADS.seedEvent({
+    namespace: "agents-repo",
+    package_id: "recent-pkg",
+    version: "1.0.0",
+    target_id: "cursor",
+    downloaded_at: "2026-08-24 12:00:00",
+  });
+  env.DOWNLOADS.seedEvent({
+    namespace: "agents-repo",
+    package_id: "old-pkg",
+    version: "1.0.0",
+    target_id: "cursor",
+    downloaded_at: "2025-01-01 12:00:00",
+  });
+  env.DOWNLOADS.seedEvent({
+    namespace: "agents-repo",
+    package_id: "old-pkg",
+    version: "1.0.0",
+    target_id: "cursor",
+    downloaded_at: "2025-01-02 12:00:00",
+  });
+
+  const byAll = await resolveStatsResult("stats", env, new URLSearchParams("period=all"));
+  assert.deepEqual(byAll.payload.packages.map((row) => row.package), ["old-pkg", "recent-pkg"]);
+  assert.equal(byAll.payload.packages[0].downloads, 2);
+  assert.equal(byAll.payload.packages[0].downloads_7d, 0);
+  assert.equal(byAll.payload.packages[1].downloads_7d, 1);
+
+  const by7d = await resolveStatsResult("stats", env, new URLSearchParams("period=7d"));
+  assert.deepEqual(by7d.payload.packages.map((row) => row.package), ["recent-pkg", "old-pkg"]);
+
+  const detail = await resolveStatsResult(
+    "stats/packages/agents-repo/old-pkg",
+    env,
+    new URLSearchParams("period=7d"),
+  );
+  assert.equal(detail.payload.downloads, 2);
+  assert.equal(detail.payload.downloads_7d, 0);
+  assert.equal(detail.payload.downloads_365d, 0);
+  assert.deepEqual(detail.payload.artifacts, [
+    { version: "1.0.0", target: "cursor", downloads: 2 },
+  ]);
 });
 
 test("resolveStatsResult returns 503 when D1 queries throw", async () => {

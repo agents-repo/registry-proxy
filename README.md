@@ -106,7 +106,7 @@ branch `main`.
 1. Install Wrangler and authenticate to the Agents Repo Cloudflare account (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 2. Optional but recommended: set a GitHub token secret for higher upstream reliability and rate-limit headroom:
    - `npx wrangler secret put GITHUB_TOKEN`
-3. Apply D1 migrations before deploy (`npx wrangler d1 migrations apply registry-proxy-downloads --remote`). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+3. Apply D1 migrations before deploy (`./scripts/migrate.sh`). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 4. Deploy:
    - `./scripts/deploy.sh`
    - or `npx --ignore-scripts wrangler deploy`
@@ -186,21 +186,33 @@ curl -s "https://registry.agents-repo.org/tags"
 ## Download stats
 
 `GET /stats` returns package download totals counted from successful ZIP GETs
-through this Worker (including cache hits). Counts are stored in Cloudflare D1.
+through this Worker (including cache hits). Each ZIP `200` inserts one D1
+`download_events` row with a UTC ISO-8601 `downloaded_at` timestamp. `/stats`
+aggregates those events (no hourly rollup).
 
 - Root meta route (not `/main/stats` — that is a file path).
 - Query `ref` is ignored: `/stats?ref=v2.x` is still stats.
-- `GET /stats` → `{ "packages": [{ "namespace", "package", "downloads" }] }`
-- `GET /stats/packages/<namespace>/<package-id>` → package total plus per-artifact rows
-- Unknown packages return HTTP 200 with `downloads: 0`
+- `GET /stats` → `{ "packages": [{ "namespace", "package", "downloads",
+  "downloads_7d", "downloads_30d", "downloads_365d" }] }`
+- Optional `?period=all|7d|30d|365d` changes sort order only (default `all`).
+  Unknown period → HTTP 400.
+- Windows are rolling (`datetime('now', '-7 days')` and the same pattern for
+  30d and 365d). `downloads` is all-time.
+- `GET /stats/packages/<namespace>/<package-id>` → four package totals plus
+  per-artifact all-time rows
+- Unknown packages return HTTP 200 with zeros
 - Missing D1 returns HTTP 503
 - Responses include CORS `Access-Control-Allow-Origin: *` and
   `Cache-Control: public, max-age=60`
+
+Migration `0002` drops undated `download_counts` and creates `download_events`.
+Apply it **before** deploying this Worker. That reset is intentional (no backfill).
 
 Example:
 
 ```bash
 curl -s "https://registry.agents-repo.org/stats"
+curl -s "https://registry.agents-repo.org/stats?period=365d"
 curl -s "https://registry.agents-repo.org/stats/packages/agents-repo/hello-agent"
 ```
 

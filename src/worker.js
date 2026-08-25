@@ -103,6 +103,7 @@ function usagePayload() {
       "/pkg/<namespace>/<package-id>/...[?ref=<ref>][&version=<semver>]",
       "/tags",
       "/stats",
+      "/stats?period=all|7d|30d|365d",
       "/stats/packages/<namespace>/<package-id>",
     ],
     examples: [
@@ -120,6 +121,7 @@ function usagePayload() {
       "/pkg/agents-repo/hello-agent/1.0.0/instructions.json?ref=v2.x",
       "/tags",
       "/stats",
+      "/stats?period=365d",
       "/stats/packages/agents-repo/hello-agent",
     ],
   };
@@ -839,8 +841,8 @@ async function handlePkgRouteRequest(requestUrl, env, request, ctx) {
   }, 400);
 }
 
-async function handleStatsRouteRequest(normalizedPath, env) {
-  const result = await resolveStatsResult(normalizedPath, env);
+async function handleStatsRouteRequest(normalizedPath, env, searchParams) {
+  const result = await resolveStatsResult(normalizedPath, env, searchParams);
   const response = jsonResponse(result.payload, result.status);
   if (!result.cacheControl) {
     return response;
@@ -863,7 +865,7 @@ async function handleWorkerGet(request, env, ctx) {
   }
 
   if (normalizedPath !== null && (normalizedPath === "stats" || normalizedPath.startsWith("stats/"))) {
-    return handleStatsRouteRequest(normalizedPath, env);
+    return handleStatsRouteRequest(normalizedPath, env, requestUrl.searchParams);
   }
 
   const target = getProxyTarget(requestUrl);

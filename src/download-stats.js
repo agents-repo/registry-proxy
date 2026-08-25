@@ -2,7 +2,16 @@ import { isSafePackageVersion } from "./pkg-routes.js";
 
 export const STATS_CLIENT_TTL_SECONDS = 60;
 
+export const STATS_PERIODS = ["all", "7d", "30d", "365d"];
+
 const ZIP_EXTENSION = ".zip";
+
+const WINDOW_ORDER_COLUMN = {
+  all: "downloads",
+  "7d": "downloads_7d",
+  "30d": "downloads_30d",
+  "365d": "downloads_365d",
+};
 
 function segmentContainsPathSeparatorEncoding(segment) {
   return /%2[fF]|%5[cC]/.test(segment);
@@ -26,6 +35,25 @@ function trimTrailingSlashes(value) {
     end -= 1;
   }
   return value.slice(0, end);
+}
+
+function toCount(value) {
+  return Number(value) || 0;
+}
+
+export function parseStatsPeriod(searchParams) {
+  const raw = searchParams instanceof URLSearchParams
+    ? searchParams.get("period")
+    : null;
+  if (raw == null || raw === "") {
+    return { ok: true, period: "all" };
+  }
+
+  if (STATS_PERIODS.includes(raw)) {
+    return { ok: true, period: raw };
+  }
+
+  return { ok: false };
 }
 
 export function parseVersionedZipDownload(targetPath) {
@@ -99,10 +127,8 @@ export function parseStatsPath(normalizedPath) {
 
 export async function incrementZipDownload(env, parsed) {
   await env.DOWNLOADS.prepare(`
-    INSERT INTO download_counts (namespace, package_id, version, target_id, count)
-    VALUES (?, ?, ?, ?, 1)
-    ON CONFLICT (namespace, package_id, version, target_id)
-    DO UPDATE SET count = count + 1
+    INSERT INTO download_events (namespace, package_id, version, target_id, downloaded_at)
+    VALUES (?, ?, ?, ?, datetime('now'))
   `).bind(
     parsed.namespace,
     parsed.packageId,
@@ -128,44 +154,69 @@ export function scheduleZipDownloadCount(ctx, env, targetPath, status) {
   ctx.waitUntil(incrementZipDownload(env, parsed).catch(() => {}));
 }
 
-async function loadStatsList(env) {
+function mapPackageWindowRow(row) {
+  return {
+    namespace: row.namespace,
+    package: row.package_id ?? row.package,
+    downloads: toCount(row.downloads),
+    downloads_7d: toCount(row.downloads_7d),
+    downloads_30d: toCount(row.downloads_30d),
+    downloads_365d: toCount(row.downloads_365d),
+  };
+}
+
+const PACKAGE_WINDOW_SELECT = `
+  COUNT(*) AS downloads,
+  SUM(CASE WHEN downloaded_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END) AS downloads_7d,
+  SUM(CASE WHEN downloaded_at >= datetime('now', '-30 days') THEN 1 ELSE 0 END) AS downloads_30d,
+  SUM(CASE WHEN downloaded_at >= datetime('now', '-365 days') THEN 1 ELSE 0 END) AS downloads_365d
+`;
+
+async function loadStatsList(env, period) {
+  const orderColumn = WINDOW_ORDER_COLUMN[period];
   const result = await env.DOWNLOADS.prepare(`
-    SELECT namespace, package_id, SUM(count) AS downloads
-    FROM download_counts
+    SELECT namespace, package_id, ${PACKAGE_WINDOW_SELECT}
+    FROM download_events
     GROUP BY namespace, package_id
-    ORDER BY downloads DESC, namespace ASC, package_id ASC
+    ORDER BY ${orderColumn} DESC, namespace ASC, package_id ASC
   `).all();
 
-  return (result.results ?? []).map((row) => ({
-    namespace: row.namespace,
-    package: row.package_id,
-    downloads: Number(row.downloads) || 0,
-  }));
+  return (result.results ?? []).map((row) => mapPackageWindowRow(row));
 }
 
 async function loadStatsPackage(env, namespace, packageId) {
-  const result = await env.DOWNLOADS.prepare(`
-    SELECT version, target_id, count
-    FROM download_counts
+  const totals = await env.DOWNLOADS.prepare(`
+    SELECT ${PACKAGE_WINDOW_SELECT}
+    FROM download_events
     WHERE namespace = ? AND package_id = ?
+  `).bind(namespace, packageId).first();
+
+  const artifactResult = await env.DOWNLOADS.prepare(`
+    SELECT version, target_id, COUNT(*) AS count
+    FROM download_events
+    WHERE namespace = ? AND package_id = ?
+    GROUP BY version, target_id
     ORDER BY version ASC, target_id ASC
   `).bind(namespace, packageId).all();
 
-  const artifacts = (result.results ?? []).map((row) => ({
+  const artifacts = (artifactResult.results ?? []).map((row) => ({
     version: row.version,
     target: row.target_id,
-    downloads: Number(row.count) || 0,
+    downloads: toCount(row.count),
   }));
 
   return {
     namespace,
     package: packageId,
-    downloads: artifacts.reduce((sum, artifact) => sum + artifact.downloads, 0),
+    downloads: toCount(totals?.downloads),
+    downloads_7d: toCount(totals?.downloads_7d),
+    downloads_30d: toCount(totals?.downloads_30d),
+    downloads_365d: toCount(totals?.downloads_365d),
     artifacts,
   };
 }
 
-export async function resolveStatsResult(normalizedPath, env) {
+export async function resolveStatsResult(normalizedPath, env, searchParams) {
   if (!env?.DOWNLOADS) {
     return {
       status: 503,
@@ -187,11 +238,22 @@ export async function resolveStatsResult(normalizedPath, env) {
     };
   }
 
+  const periodResult = parseStatsPeriod(searchParams);
+  if (!periodResult.ok) {
+    return {
+      status: 400,
+      payload: {
+        error: "invalid_stats_period",
+        message: "Unsupported period. Use all, 7d, 30d, or 365d.",
+      },
+    };
+  }
+
   try {
     if (parsed.kind === "list") {
       return {
         status: 200,
-        payload: { packages: await loadStatsList(env) },
+        payload: { packages: await loadStatsList(env, periodResult.period) },
         cacheControl: `public, max-age=${STATS_CLIENT_TTL_SECONDS}`,
       };
     }

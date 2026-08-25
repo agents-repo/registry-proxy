@@ -13,7 +13,7 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 5. Worker returns upstream response and caches successful results.
 6. For HTTP 200 file responses, Worker normalizes `Content-Type` from the
    requested path extension when mapped (see **Content-Type normalization**).
-7. For HTTP 200 versioned ZIP artifacts, Worker increments Cloudflare D1 in
+7. For HTTP 200 versioned ZIP artifacts, Worker inserts a D1 download event in
    `ctx.waitUntil` (cache hit and miss). A D1 failure does not fail the ZIP
    response.
 
@@ -21,7 +21,7 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 
 - Worker runtime: request parsing, mapping, fetch, response handling.
 - Cloudflare edge cache: response reuse for repeated GET requests.
-- Cloudflare D1 (`DOWNLOADS`): per-artifact ZIP download counters.
+- Cloudflare D1 (`DOWNLOADS`): timestamped ZIP download events (`download_events`).
 - Cloudflare secret: `GITHUB_TOKEN` for authenticated GitHub Contents API and tags API access.
 
 ## Path Mapping
@@ -86,13 +86,24 @@ When the extension is not in the table above:
 ## Download stats
 
 - Incoming paths MUST start with `/stats` (root meta route, same prefix pattern as `/pkg/`).
-- `GET /stats` returns `{ "packages": [{ "namespace", "package", "downloads" }] }`
-  sorted by downloads descending, then namespace, then package.
-- `GET /stats/packages/<namespace>/<package-id>` returns package total plus
-  `{ "version", "target", "downloads" }` artifact rows. Unknown packages return
-  HTTP 200 with `downloads: 0` and empty `artifacts`.
-- Query `ref` is ignored. Path-style `/main/stats` remains a file proxy.
-- Counts increment on HTTP 200 versioned ZIP paths
+- Each HTTP 200 versioned ZIP GET inserts one `download_events` row with
+  `downloaded_at` TEXT UTC ISO-8601 from SQLite `datetime('now')`
+  (`YYYY-MM-DD HH:MM:SS`). Do not write JavaScript `toISOString()`.
+- Migration `0002` drops undated `download_counts` and creates `download_events`.
+  Applying it wipes recent all-time totals. There is no backfill.
+- `GET /stats` aggregates events directly (no summary table or Cron). Each package
+  item is `{ "namespace", "package", "downloads", "downloads_7d", "downloads_30d",
+  "downloads_365d" }`. Sorted by the selected period descending, then namespace,
+  then package.
+- Optional `?period=all|7d|30d|365d` changes **ORDER BY only** (default `all`).
+  Unknown `period` returns HTTP 400 (`invalid_stats_period`). Query `ref` is ignored.
+- Windows are rolling UTC time: `7d` is `downloaded_at >= datetime('now', '-7 days')`
+  (same pattern for 30d and 365d). All-time is every event. Do not prune events.
+- `GET /stats/packages/<namespace>/<package-id>` returns the same four package
+  totals plus `{ "version", "target", "downloads" }` artifact rows (all-time only).
+  Unknown packages return HTTP 200 with zeros and empty `artifacts`.
+- Path-style `/main/stats` remains a file proxy.
+- Counts insert on HTTP 200 versioned ZIP paths
   `packages/<namespace>/<package-id>/versions/<semver>/<semver>-<target-id>.zip`
   (cache hit and miss). Counts are ref-agnostic.
 - Non-ZIP paths, 304, 4xx/5xx, and `/pkg/` resources are not counted.
@@ -144,7 +155,7 @@ Other file-proxy paths keep unbounded edge cache without worker TTL or client
 
 - Supported: `GET`
 - Unsupported methods return `405 Method Not Allowed`.
-- Successful ZIP GETs may write a download increment to D1. That is a GET
+- Successful ZIP GETs may insert a download event in D1. That is a GET
   side-effect, not a new HTTP write method.
 
 ## Security Boundaries
@@ -166,4 +177,4 @@ Other file-proxy paths keep unbounded edge cache without worker TTL or client
 - Download counts are a traffic counter, not anti-fraud. Repeated GETs, crawlers,
   and client retries after HTTP 200 can inflate totals. Direct GitHub Raw
   downloads and CLI local cache hits are not counted.
-- `/stats` may lag increments by up to 60 seconds (`Cache-Control: max-age=60`).
+- `/stats` may lag event inserts by up to 60 seconds (`Cache-Control: max-age=60`).
