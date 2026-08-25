@@ -59,7 +59,7 @@ jobs:
 
       - name: Skip slide PDF check
         if: needs.changes.outputs.slides != 'true'
-        run: echo "Skipping slides:check; PR paths do not match the slides group (docs/slides/**, scripts/slides.mjs, npm lockfiles, or .github/workflows/pr-baseline.yml)."
+        run: echo "Skipping slides:check; PR paths do not match the slides group (docs/slides/**, scripts/slides.mjs, npm lockfiles, .github/workflows/pr-baseline.yml, or scripts/ci-pr-path-filters.mjs)."
 
       - name: Verify registry package installs from lock
         if: needs.changes.outputs.agents == 'true'
@@ -79,7 +79,7 @@ jobs:
 
       - name: Skip registry package checksum
         if: needs.changes.outputs.agents != 'true'
-        run: echo "Skipping agents:ci checksum; PR paths do not match agents definition files (agents.json, agents-lock.json, extracted agent paths, or pr-baseline.yml). npm lockfiles alone do not trigger this step."
+        run: echo "Skipping agents:ci checksum; PR paths do not match agents definition files (agents.json, agents-lock.json, extracted agent paths, pr-baseline.yml, or scripts/ci-pr-path-filters.mjs). npm lockfiles alone do not trigger this step."
 
       - name: Run tests
         run: npm run test

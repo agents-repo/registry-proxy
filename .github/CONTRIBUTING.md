@@ -124,8 +124,10 @@ npm run agents:ci        # checksum extra in pr-baseline when agents paths chang
 Commit `agents.json`, `agents-lock.json`, and extracted paths (`.github/agents/`, `.cursor/skills/`, `.claude/agents/`, `.agents/skills/`). Do not hand-edit extracted package files.
 
 PR baseline runs `npm run agents:ci` only when agents definition files change
-(not npm lockfiles) to reinstall from the committed registry lock and fail on
-extract drift ([agents-repo/.github#32](https://github.com/agents-repo/.github/issues/32),
+(not npm lockfiles), or when control-plane files for this extra change
+(`.github/workflows/pr-baseline.yml`, `scripts/ci-pr-path-filters.mjs`), to
+reinstall from the committed registry lock and fail on extract drift
+([agents-repo/.github#32](https://github.com/agents-repo/.github/issues/32),
 [agents-repo/.github#34](https://github.com/agents-repo/.github/issues/34)).
 Chrome/`slides:check` is also a path-filtered extra. Follow the organization
 [PR baseline extras (path filters)](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pr-baseline-extras-path-filters).
