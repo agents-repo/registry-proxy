@@ -133,6 +133,10 @@ tooling path, but MUST explicitly note that limitation in the handoff summary.
   `./scripts/migrate.sh`
   (`scripts/deploy.sh` does not apply migrations).
 
+PR baseline extras (Chrome/`slides:check` and `agents:ci`) are path-filtered.
+npm lockfiles do **not** trigger `agents:ci`. See the organization
+[PR baseline extras (path filters)](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pr-baseline-extras-path-filters).
+
 ## Pre-ready handoff
 
 Before handoff on a task branch, agents MUST complete the organization

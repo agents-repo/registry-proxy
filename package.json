@@ -18,7 +18,7 @@
     "agents:install": "agents-repo install",
     "agents:update": "agents-repo update",
     "agents:ci": "agents-repo ci",
-    "test:sync": "node --test test/sync-ide-instructions.test.mjs test/commit-analyzer-rules.test.mjs",
+    "test:sync": "node --test test/sync-ide-instructions.test.mjs test/commit-analyzer-rules.test.mjs test/ci-pr-path-filters.test.mjs",
     "check:secrets": "bash scripts/check-secrets.sh",
     "test": "npm run test:sync && node --test 'test/**/*.test.js'",
     "release": "semantic-release",
