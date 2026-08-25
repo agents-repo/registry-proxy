@@ -6,18 +6,22 @@ Proxy registry files through Cloudflare Workers with caching, using GitHub Raw b
 
 ## Request Lifecycle
 
-1. Client requests a registry path on `https://registry.agents-repo.org`, or `GET /tags` for tag listing.
-2. Worker normalizes the path and builds the upstream URL (file content or tags API).
+1. Client requests a registry path on `https://registry.agents-repo.org`, `GET /tags` for tag listing, or `GET /stats` for download totals.
+2. Worker normalizes the path and builds the upstream URL (file content or tags API). Stats routes do not proxy upstream.
 3. Worker checks `caches.default` by resolved upstream URL.
 4. On miss, Worker fetches GitHub Raw when no token is present, or GitHub Contents API with `Accept: application/vnd.github.raw` when `GITHUB_TOKEN` is present. Tag listing always uses the GitHub tags API with optional token auth.
 5. Worker returns upstream response and caches successful results.
 6. For HTTP 200 file responses, Worker normalizes `Content-Type` from the
    requested path extension when mapped (see **Content-Type normalization**).
+7. For HTTP 200 versioned ZIP artifacts, Worker increments Cloudflare D1 in
+   `ctx.waitUntil` (cache hit and miss). A D1 failure does not fail the ZIP
+   response.
 
 ## Components
 
 - Worker runtime: request parsing, mapping, fetch, response handling.
 - Cloudflare edge cache: response reuse for repeated GET requests.
+- Cloudflare D1 (`DOWNLOADS`): per-artifact ZIP download counters.
 - Cloudflare secret: `GITHUB_TOKEN` for authenticated GitHub Contents API and tags API access.
 
 ## Path Mapping
@@ -79,6 +83,25 @@ When the extension is not in the table above:
   TTL check.
 - Path-style routes such as `/main/tags` remain file proxy requests, not tag listing
 
+## Download stats
+
+- Incoming paths MUST start with `/stats` (root meta route, same prefix pattern as `/pkg/`).
+- `GET /stats` returns `{ "packages": [{ "namespace", "package", "downloads" }] }`
+  sorted by downloads descending, then namespace, then package.
+- `GET /stats/packages/<namespace>/<package-id>` returns package total plus
+  `{ "version", "target", "downloads" }` artifact rows. Unknown packages return
+  HTTP 200 with `downloads: 0` and empty `artifacts`.
+- Query `ref` is ignored. Path-style `/main/stats` remains a file proxy.
+- Counts increment on HTTP 200 versioned ZIP paths
+  `packages/<namespace>/<package-id>/versions/<semver>/<semver>-<target-id>.zip`
+  (cache hit and miss). Counts are ref-agnostic.
+- Non-ZIP paths, 304, 4xx/5xx, and `/pkg/` resources are not counted.
+- Client `Cache-Control: public, max-age=60`. Stats responses are **not** stored
+  in `caches.default`.
+- Missing D1: ZIP downloads still succeed; `/stats` returns HTTP 503
+  (`downloads_unavailable`).
+- HTTP stays GET-only. D1 writes are a GET side-effect.
+
 ## Catalog and versioned file cache
 
 Mutable catalog files use the same 300-second worker TTL pattern as `/tags`:
@@ -121,11 +144,16 @@ Other file-proxy paths keep unbounded edge cache without worker TTL or client
 
 - Supported: `GET`
 - Unsupported methods return `405 Method Not Allowed`.
+- Successful ZIP GETs may write a download increment to D1. That is a GET
+  side-effect, not a new HTTP write method.
 
 ## Security Boundaries
 
 - Token is only read from Worker environment (`env.GITHUB_TOKEN`).
 - Token is never committed in source control or wrangler config.
+- D1 `database_id` in `wrangler.toml` is an account identifier, not a secret.
+  Forks on another Cloudflare account MUST create their own D1 database and
+  replace `database_id`.
 
 ## Known Limitations
 
@@ -135,4 +163,7 @@ Other file-proxy paths keep unbounded edge cache without worker TTL or client
   300-second worker TTL; versioned snapshot files stay unbounded at the edge
   and send client `Cache-Control: max-age=300`. See **Catalog and versioned
   file cache**.
-- No write operations are supported.
+- Download counts are a traffic counter, not anti-fraud. Repeated GETs, crawlers,
+  and client retries after HTTP 200 can inflate totals. Direct GitHub Raw
+  downloads and CLI local cache hits are not counted.
+- `/stats` may lag increments by up to 60 seconds (`Cache-Control: max-age=60`).

@@ -1,5 +1,9 @@
 import { resolvePkgProxyTarget, isSafePackageVersion, DEFAULT_REF } from "./pkg-routes.js";
 import { withResolvedContentType } from "./content-type.js";
+import {
+  resolveStatsResult,
+  scheduleZipDownloadCount,
+} from "./download-stats.js";
 
 const REPO_OWNER = "agents-repo";
 const REPO_NAME = "registry";
@@ -98,6 +102,8 @@ function usagePayload() {
       "/<path>?ref=<ref>",
       "/pkg/<namespace>/<package-id>/...[?ref=<ref>][&version=<semver>]",
       "/tags",
+      "/stats",
+      "/stats/packages/<namespace>/<package-id>",
     ],
     examples: [
       "/main/packages/index.json",
@@ -113,6 +119,8 @@ function usagePayload() {
       "/pkg/agents-repo/hello-agent/flows/hello-agents?ref=v2.x&version=1.0.0",
       "/pkg/agents-repo/hello-agent/1.0.0/instructions.json?ref=v2.x",
       "/tags",
+      "/stats",
+      "/stats/packages/agents-repo/hello-agent",
     ],
   };
 }
@@ -558,6 +566,8 @@ export {
   resolvePkgProxyTarget,
 } from "./pkg-routes.js";
 
+export { STATS_CLIENT_TTL_SECONDS } from "./download-stats.js";
+
 export {
   buildContentsApiUrl,
   buildTagsApiUrl,
@@ -744,6 +754,7 @@ async function handleProxyRoute(target, env, request, ctx) {
   );
 
   if (freshResponse) {
+    scheduleZipDownloadCount(ctx, env, target.targetPath, freshResponse.status);
     return freshResponse;
   }
 
@@ -781,7 +792,9 @@ async function handleProxyRoute(target, env, request, ctx) {
     storeSuccessfulFileProxyResponse(ctx, cache, cacheKey, cacheClass, response);
   }
 
-  return clientFileProxyResponse(response, cacheClass);
+  const clientResponse = clientFileProxyResponse(response, cacheClass);
+  scheduleZipDownloadCount(ctx, env, target.targetPath, clientResponse.status);
+  return clientResponse;
 }
 
 function finishProxyTargetResponse(target, env, request, ctx) {
@@ -826,11 +839,31 @@ async function handlePkgRouteRequest(requestUrl, env, request, ctx) {
   }, 400);
 }
 
+async function handleStatsRouteRequest(normalizedPath, env) {
+  const result = await resolveStatsResult(normalizedPath, env);
+  const response = jsonResponse(result.payload, result.status);
+  if (!result.cacheControl) {
+    return response;
+  }
+
+  const headers = new Headers(response.headers);
+  headers.set("Cache-Control", result.cacheControl);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 async function handleWorkerGet(request, env, ctx) {
   const requestUrl = new URL(request.url);
   const normalizedPath = normalizePath(requestUrl.pathname);
   if (normalizedPath !== null && (normalizedPath === "pkg" || normalizedPath.startsWith("pkg/"))) {
     return handlePkgRouteRequest(requestUrl, env, request, ctx);
+  }
+
+  if (normalizedPath !== null && (normalizedPath === "stats" || normalizedPath.startsWith("stats/"))) {
+    return handleStatsRouteRequest(normalizedPath, env);
   }
 
   const target = getProxyTarget(requestUrl);

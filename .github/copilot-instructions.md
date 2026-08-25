@@ -75,10 +75,12 @@ See `.github/CONTRIBUTING.md` **Branch Naming** and the organization
 
 ## Guardrails
 
-- Worker must remain read-only unless issue explicitly changes method policy.
+- Worker HTTP API must remain GET-only unless an issue explicitly changes method
+  policy. D1 increments on successful ZIP GETs are a GET side-effect.
 - Path mapping must resolve to GitHub Raw upstream paths.
 - Use `env.GITHUB_TOKEN` for upstream auth when available.
 - Use `caches.default` for cache-first response behavior.
+- Use `env.DOWNLOADS` (D1) for ZIP download counts. Do not store counts in KV.
 - Never hardcode or commit token values.
 
 ## GitHub Communication Method (gh CLI Preferred)
@@ -127,6 +129,9 @@ tooling path, but MUST explicitly note that limitation in the handoff summary.
 - Run `npm run test`.
 - Verify target endpoints return expected statuses.
 - Confirm cache behavior with repeated requests.
+- When changing D1 schema or deploy, apply migrations before deploy:
+  `npx wrangler d1 migrations apply registry-proxy-downloads --remote`
+  (`scripts/deploy.sh` does not apply migrations).
 
 ## Pre-ready handoff
 
