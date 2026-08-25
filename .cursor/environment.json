@@ -1,0 +1,4 @@
+{
+  "name": "agents-repo/registry-proxy",
+  "install": "bash .cursor/install.sh"
+}
