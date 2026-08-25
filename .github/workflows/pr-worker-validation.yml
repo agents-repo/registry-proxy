@@ -29,5 +29,10 @@ jobs:
       - name: Verify deploy script policy
         run: grep -n "wrangler deploy" scripts/deploy.sh
 
+      - name: Verify migrate script policy
+        run: |
+          grep -n "d1 migrations apply" scripts/migrate.sh
+          grep -n -- "--remote" scripts/migrate.sh
+
       - name: Secret scan
         run: npm run check:secrets

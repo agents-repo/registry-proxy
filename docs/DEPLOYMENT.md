@@ -93,10 +93,10 @@ Copy the printed `database_id` into `wrangler.toml`. Use binding name
 
 Apply migrations **before** deploying Worker code that reads the table.
 `wrangler deploy` does **not** apply D1 migrations, and `scripts/deploy.sh`
-stays deploy-only:
+stays deploy-only. Use `scripts/migrate.sh` for the remote D1 apply:
 
 ```bash
-npx wrangler d1 migrations apply registry-proxy-downloads --remote
+./scripts/migrate.sh
 ./scripts/deploy.sh
 ```
 

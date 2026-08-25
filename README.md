@@ -106,7 +106,7 @@ branch `main`.
 1. Install Wrangler and authenticate to the Agents Repo Cloudflare account (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 2. Optional but recommended: set a GitHub token secret for higher upstream reliability and rate-limit headroom:
    - `npx wrangler secret put GITHUB_TOKEN`
-3. Apply D1 migrations before deploy (`npx wrangler d1 migrations apply registry-proxy-downloads --remote`). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+3. Apply D1 migrations before deploy (`./scripts/migrate.sh`). See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 4. Deploy:
    - `./scripts/deploy.sh`
    - or `npx --ignore-scripts wrangler deploy`

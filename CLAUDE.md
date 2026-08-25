@@ -132,7 +132,7 @@ tooling path, but MUST explicitly note that limitation in the handoff summary.
 - Verify target endpoints return expected statuses.
 - Confirm cache behavior with repeated requests.
 - When changing D1 schema or deploy, apply migrations before deploy:
-  `npx wrangler d1 migrations apply registry-proxy-downloads --remote`
+  `./scripts/migrate.sh`
   (`scripts/deploy.sh` does not apply migrations).
 
 ## Pre-ready handoff

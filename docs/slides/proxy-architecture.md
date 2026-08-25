@@ -141,7 +141,7 @@ Unmapped + `vnd.github.raw` → `application/octet-stream`.
 Apply D1 migrations first (`wrangler deploy` does not):
 
 ```bash
-npx wrangler d1 migrations apply registry-proxy-downloads --remote
+./scripts/migrate.sh
 ./scripts/deploy.sh
 ```
 
