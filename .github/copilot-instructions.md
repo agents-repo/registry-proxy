@@ -142,3 +142,23 @@ norm, run **Required Validation** above, perform a self-review, and update the
 After editing `.github/copilot-instructions.md`, run `npm run sync:ide-instructions`. See
 `docs/AI_GUIDELINES.md`
 for contributor-oriented detail.
+
+## Cursor Cloud environment
+
+This repository commits `.cursor/environment.json`. Cloud Agent builds run
+`.cursor/install.sh` (nvm Node `24.18.0` from `.nvmrc`, npm `12.0.1` from
+`packageManager`, then `HUSKY=0 npm ci`). `npm run env:check` requires the
+exact Node patch.
+
+`/exec-daemon/node` (Node 22) may precede nvm on `PATH`. Before running
+repo scripts, prepend the pinned Node bin:
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+. "$NVM_DIR/nvm.sh"
+nvm use
+export PATH="$(dirname "$(nvm which 24.18.0)"):$PATH"
+```
+
+Do not start long-running servers from `install`. Local `wrangler` commands
+need Cloudflare credentials; unit tests (`npm run test`) do not.

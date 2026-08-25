@@ -20,6 +20,11 @@ npm run env:check
 
 Continue only when npm resolves to `12.0.1`.
 
+Cursor Cloud Agents run `.cursor/install.sh` instead of this manual
+sequence. `/exec-daemon/node` (Node 22) may precede nvm on `PATH`; prepend
+the pinned Node bin before `npm run env:check`. See
+`.github/copilot-instructions.md` **Cursor Cloud environment**.
+
 ## 1. Create Issue
 
 Use the matching issue form under `.github/ISSUE_TEMPLATE/` when available.
