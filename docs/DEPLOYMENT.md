@@ -100,7 +100,11 @@ npx wrangler d1 migrations apply registry-proxy-downloads --remote
 ./scripts/deploy.sh
 ```
 
-If you deploy first, ZIP downloads still succeed (increment errors are
+Migration `0002` **drops** `download_counts` and creates `download_events`.
+That wipes undated all-time totals from v2.2.0. Apply `0002` and deploy the new
+Worker immediately; old UPSERT SQL will not match the new table.
+
+If you deploy first, ZIP downloads still succeed (insert errors are
 swallowed). `/stats` returns HTTP 503 until the D1 binding and migration are
 in place.
 
@@ -142,12 +146,14 @@ curl -i "https://registry.agents-repo.org/tags"
 curl -sI "https://registry.agents-repo.org/packages/agents-repo/hello-agent/versions/1.0.0/1.0.0-cursor.zip?ref=v2.x"
 curl -s "https://registry.agents-repo.org/stats/packages/agents-repo/hello-agent"
 curl -s "https://registry.agents-repo.org/stats"
+curl -s "https://registry.agents-repo.org/stats?period=365d"
 ```
 
 Confirm HTTP 200, `Access-Control-Allow-Origin: *`, and `.md` responses include
 `Content-Type: text/plain; charset=utf-8` where applicable. Repeat one request
 to confirm cache reuse. After a ZIP `200`, `/stats` should show `downloads >= 1`
-for that package (or the previous total plus one).
+for that package (or the previous total plus one), and the matching rolling
+window field should move when the download is recent.
 
 Also confirm `https://agents-repo.org/` is still the webapp, and
 `https://registry-proxy.maiconfz.workers.dev/packages/index.json?ref=v2.x` still

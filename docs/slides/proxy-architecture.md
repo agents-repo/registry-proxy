@@ -20,7 +20,7 @@ Cloudflare Worker that proxies **only** `agents-repo/registry` files.
 
 Callers (webapp, CLI) avoid hitting GitHub Raw on every request. HTTP is
 **GET-only** unless an issue explicitly changes method policy. Successful ZIP
-GETs increment D1 as a side-effect.
+GETs insert a D1 download event as a side-effect.
 
 ---
 
@@ -31,7 +31,7 @@ GETs increment D1 as a side-effect.
 3. Check `caches.default` by resolved upstream URL
 4. On miss, fetch upstream
 5. Cache successful 200s and return
-6. HTTP 200 versioned ZIPs increment D1 in `waitUntil`
+6. HTTP 200 versioned ZIPs insert a D1 event in `waitUntil`
 
 Details: `docs/ARCHITECTURE.md`.
 
@@ -82,9 +82,15 @@ Webapp uses this for version-line aliases such as `v2.x`. TTL: 300 seconds.
 
 Root meta route (not `/main/stats` — that is a file path). Prefix like `/pkg/`.
 
-- `/stats` — package totals from D1
-- `/stats/packages/<namespace>/<package-id>` — per-artifact rows
-- Increments on HTTP 200 versioned ZIP GETs (cache hit and miss)
+- `/stats` — package totals from D1 `download_events` (`downloads`,
+  `downloads_7d`, `downloads_30d`, `downloads_365d`)
+- `?period=all|7d|30d|365d` — ORDER BY only (default `all`); unknown period is 400
+- Rolling windows: `datetime('now', '-7 days')` and the same pattern for 30d/365d
+- `/stats/packages/<namespace>/<package-id>` — four package totals plus
+  all-time per-artifact rows
+- One INSERT per HTTP 200 versioned ZIP GET (cache hit and miss)
+- `downloaded_at` is TEXT UTC ISO-8601 from SQLite `datetime('now')`
+- Migration `0002` drops undated `download_counts` (intentional reset)
 - Missing D1: ZIP still 200; `/stats` is 503
 
 ---
@@ -95,7 +101,7 @@ Supported: `GET`.
 
 Anything else: `405 Method Not Allowed`.
 
-Do not add HTTP write methods without an explicit issue. D1 increments on ZIP
+Do not add HTTP write methods without an explicit issue. D1 inserts on ZIP
 GET 200 are a documented side-effect, not a new method.
 
 ---
@@ -164,4 +170,4 @@ Package authoring → registry slides.
 # Remember
 
 Read-only HTTP (GET). GitHub Raw or Contents API. Cache hit on repeat GET.
-ZIP 200s increment D1. Token never in the repo.
+ZIP 200s insert D1 events. Token never in the repo.

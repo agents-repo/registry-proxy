@@ -1,11 +1,108 @@
-export function createMemoryDownloadsDb() {
-  const rows = new Map();
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
 
-  function rowKey(namespace, packageId, version, targetId) {
-    return JSON.stringify([namespace, packageId, version, targetId]);
+export function formatSqliteUtc(date) {
+  return [
+    `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`,
+    `${pad2(date.getUTCHours())}:${pad2(date.getUTCMinutes())}:${pad2(date.getUTCSeconds())}`,
+  ].join(" ");
+}
+
+function parseSqliteUtc(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(String(value));
+  if (!match) {
+    return new Date(NaN);
+  }
+
+  return new Date(Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+    Number(match[4]),
+    Number(match[5]),
+    Number(match[6]),
+  ));
+}
+
+function offsetSqliteUtc(now, days) {
+  const date = parseSqliteUtc(now);
+  date.setUTCDate(date.getUTCDate() - days);
+  return formatSqliteUtc(date);
+}
+
+function emptyWindows() {
+  return {
+    downloads: 0,
+    downloads_7d: 0,
+    downloads_30d: 0,
+    downloads_365d: 0,
+  };
+}
+
+function addWindows(target, downloadedAt, now) {
+  target.downloads += 1;
+  if (downloadedAt >= offsetSqliteUtc(now, 7)) {
+    target.downloads_7d += 1;
+  }
+  if (downloadedAt >= offsetSqliteUtc(now, 30)) {
+    target.downloads_30d += 1;
+  }
+  if (downloadedAt >= offsetSqliteUtc(now, 365)) {
+    target.downloads_365d += 1;
+  }
+}
+
+function sortPackages(results, orderColumn) {
+  return [...results].sort((a, b) => {
+    if (b[orderColumn] !== a[orderColumn]) {
+      return b[orderColumn] - a[orderColumn];
+    }
+    if (a.namespace !== b.namespace) {
+      return a.namespace.localeCompare(b.namespace);
+    }
+    return a.package_id.localeCompare(b.package_id);
+  });
+}
+
+function orderColumnFromSql(sql) {
+  if (sql.includes("ORDER BY downloads_7d")) {
+    return "downloads_7d";
+  }
+  if (sql.includes("ORDER BY downloads_30d")) {
+    return "downloads_30d";
+  }
+  if (sql.includes("ORDER BY downloads_365d")) {
+    return "downloads_365d";
+  }
+  return "downloads";
+}
+
+export function createMemoryDownloadsDb(options = {}) {
+  const events = [];
+  let now = options.now ?? formatSqliteUtc(new Date());
+
+  function windowTotals(filtered) {
+    const totals = emptyWindows();
+    for (const event of filtered) {
+      addWindows(totals, event.downloaded_at, now);
+    }
+    return totals;
   }
 
   return {
+    setNow(value) {
+      now = value;
+    },
+    seedEvent(event) {
+      events.push({
+        namespace: event.namespace,
+        package_id: event.packageId ?? event.package_id,
+        version: event.version,
+        target_id: event.targetId ?? event.target_id,
+        downloaded_at: event.downloaded_at,
+      });
+    },
     prepare(sql) {
       const normalized = String(sql).replace(/\s+/g, " ").trim();
       let params = [];
@@ -21,64 +118,59 @@ export function createMemoryDownloadsDb() {
           }
 
           const [namespace, packageId, version, targetId] = params;
-          const key = rowKey(namespace, packageId, version, targetId);
-          const existing = rows.get(key);
-          if (existing) {
-            existing.count += 1;
-          } else {
-            rows.set(key, {
-              namespace,
-              package_id: packageId,
-              version,
-              target_id: targetId,
-              count: 1,
-            });
-          }
+          events.push({
+            namespace,
+            package_id: packageId,
+            version,
+            target_id: targetId,
+            downloaded_at: now,
+          });
 
           return { success: true };
         },
         async all() {
-          if (/GROUP BY/i.test(normalized)) {
+          if (/GROUP BY namespace, package_id/i.test(normalized)) {
             const totals = new Map();
-            for (const row of rows.values()) {
-              const key = `${row.namespace}\0${row.package_id}`;
+            for (const event of events) {
+              const key = `${event.namespace}\0${event.package_id}`;
               const current = totals.get(key) ?? {
-                namespace: row.namespace,
-                package_id: row.package_id,
-                downloads: 0,
+                namespace: event.namespace,
+                package_id: event.package_id,
+                ...emptyWindows(),
               };
-              current.downloads += row.count;
+              addWindows(current, event.downloaded_at, now);
               totals.set(key, current);
             }
 
-            const results = [...totals.values()].sort((a, b) => {
-              if (b.downloads !== a.downloads) {
-                return b.downloads - a.downloads;
-              }
-              if (a.namespace !== b.namespace) {
-                return a.namespace.localeCompare(b.namespace);
-              }
-              return a.package_id.localeCompare(b.package_id);
-            });
-
-            return { results, success: true };
+            return {
+              results: sortPackages([...totals.values()], orderColumnFromSql(normalized)),
+              success: true,
+            };
           }
 
-          if (/WHERE/i.test(normalized)) {
+          if (/GROUP BY version, target_id/i.test(normalized)) {
             const [namespace, packageId] = params;
-            const results = [...rows.values()]
-              .filter((row) => row.namespace === namespace && row.package_id === packageId)
-              .map((row) => ({
-                version: row.version,
-                target_id: row.target_id,
-                count: row.count,
-              }))
-              .sort((a, b) => {
-                if (a.version !== b.version) {
-                  return a.version.localeCompare(b.version);
-                }
-                return a.target_id.localeCompare(b.target_id);
-              });
+            const artifacts = new Map();
+            for (const event of events) {
+              if (event.namespace !== namespace || event.package_id !== packageId) {
+                continue;
+              }
+              const key = `${event.version}\0${event.target_id}`;
+              const current = artifacts.get(key) ?? {
+                version: event.version,
+                target_id: event.target_id,
+                count: 0,
+              };
+              current.count += 1;
+              artifacts.set(key, current);
+            }
+
+            const results = [...artifacts.values()].sort((a, b) => {
+              if (a.version !== b.version) {
+                return a.version.localeCompare(b.version);
+              }
+              return a.target_id.localeCompare(b.target_id);
+            });
 
             return { results, success: true };
           }
@@ -86,6 +178,14 @@ export function createMemoryDownloadsDb() {
           return { results: [], success: true };
         },
         async first() {
+          if (/WHERE namespace = \? AND package_id = \?/i.test(normalized) && /COUNT\(\*\)/i.test(normalized)) {
+            const [namespace, packageId] = params;
+            const filtered = events.filter(
+              (event) => event.namespace === namespace && event.package_id === packageId,
+            );
+            return windowTotals(filtered);
+          }
+
           const { results } = await this.all();
           return results[0] ?? null;
         },

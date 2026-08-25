@@ -1590,7 +1590,14 @@ test("fetch increments D1 on ZIP 200 cache miss and cache hit", async () => {
 
     const afterMiss = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
     assert.deepEqual(await afterMiss.json(), {
-      packages: [{ namespace: "agents-repo", package: "hello-agent", downloads: 1 }],
+      packages: [{
+        namespace: "agents-repo",
+        package: "hello-agent",
+        downloads: 1,
+        downloads_7d: 1,
+        downloads_30d: 1,
+        downloads_365d: 1,
+      }],
     });
 
     const second = collectingWaitUntil();
@@ -1604,7 +1611,14 @@ test("fetch increments D1 on ZIP 200 cache miss and cache hit", async () => {
 
     const afterHit = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
     assert.deepEqual(await afterHit.json(), {
-      packages: [{ namespace: "agents-repo", package: "hello-agent", downloads: 2 }],
+      packages: [{
+        namespace: "agents-repo",
+        package: "hello-agent",
+        downloads: 2,
+        downloads_7d: 2,
+        downloads_30d: 2,
+        downloads_365d: 2,
+      }],
     });
   } finally {
     globalThis.caches = originalCaches;
@@ -1651,6 +1665,9 @@ test("fetch counts path-style and query-ref ZIP URLs as the same row", async () 
       namespace: "agents-repo",
       package: "hello-agent",
       downloads: 2,
+      downloads_7d: 2,
+      downloads_30d: 2,
+      downloads_365d: 2,
       artifacts: [{ version: "1.0.0", target: "cursor", downloads: 2 }],
     });
   } finally {
@@ -1770,6 +1787,17 @@ test("fetch /stats/other returns 400", async () => {
   assert.equal(response.status, 400);
   const payload = await response.json();
   assert.equal(payload.error, "invalid_stats_path");
+});
+
+test("fetch /stats?period=today returns 400", async () => {
+  const response = await worker.fetch(
+    new Request("https://worker.example/stats?period=today"),
+    { DOWNLOADS: createMemoryDownloadsDb() },
+    { waitUntil() {} },
+  );
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.equal(payload.error, "invalid_stats_period");
 });
 
 test("fetch /stats?ref=v2.x is stats, not a file proxy", async () => {
