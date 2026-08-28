@@ -1,0 +1,8 @@
+# Cursor indexer exclusions — see agents-repo/.github docs/cursor-cloud.md
+node_modules/
+package-lock.json
+.cache/
+dist/
+coverage/
+.wrangler/
+docs/slides/build/
