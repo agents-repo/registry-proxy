@@ -4,12 +4,26 @@ This repository implements a Cloudflare Worker proxy for registry assets.
 
 ## Before Coding (Required)
 
-1. Read [../docs/AI_GUIDELINES.md](../docs/AI_GUIDELINES.md).
-2. Read [../docs/CLI_WORKFLOW.md](../docs/CLI_WORKFLOW.md).
-3. Read [../docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
-4. Read [CONTRIBUTING.md](CONTRIBUTING.md).
-5. Use an issue form under `.github/ISSUE_TEMPLATE/` before implementation.
-6. Confirm no secret values are introduced into tracked files.
+1. Read [docs/AI_GUIDELINES.md](../docs/AI_GUIDELINES.md).
+2. Read [docs/proxy-vs-registry.md](../docs/proxy-vs-registry.md).
+3. Read [docs/local-validation-without-cloudflare.md](../docs/local-validation-without-cloudflare.md).
+4. Read [docs/CLI_WORKFLOW.md](../docs/CLI_WORKFLOW.md).
+5. Read [docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md).
+6. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+7. Use an issue form under `.github/ISSUE_TEMPLATE/` before implementation.
+8. Confirm no secret values are introduced into tracked files.
+
+## Registry spec dependencies
+
+Path and ZIP semantics are defined upstream in
+[agents-repo/registry](https://github.com/agents-repo/registry) `specs/`.
+Read before changing worker routing:
+
+- [package-format.md](https://github.com/agents-repo/registry/blob/main/specs/package-format.md)
+- [chat-consumption.md](https://github.com/agents-repo/registry/blob/main/specs/chat-consumption.md)
+- [manifest-schema.md](https://github.com/agents-repo/registry/blob/main/specs/manifest-schema.md)
+
+See [docs/proxy-vs-registry.md](../docs/proxy-vs-registry.md).
 
 ## Required Workflow (Task Start)
 

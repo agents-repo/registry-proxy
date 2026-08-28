@@ -14,6 +14,17 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 5. Read [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
 6. Confirm scope from the linked issue.
 
+## Registry spec dependencies
+
+When editing worker routing or cache behavior, read upstream registry specs:
+
+- [package-format.md](https://github.com/agents-repo/registry/blob/main/specs/package-format.md)
+- [chat-consumption.md](https://github.com/agents-repo/registry/blob/main/specs/chat-consumption.md)
+- [manifest-schema.md](https://github.com/agents-repo/registry/blob/main/specs/manifest-schema.md)
+
+See [docs/proxy-vs-registry.md](proxy-vs-registry.md) and
+[docs/local-validation-without-cloudflare.md](local-validation-without-cloudflare.md).
+
 ## Working Rules
 
 - Follow `.github/CONTRIBUTING.md` **Required Workflow** before implementation.
