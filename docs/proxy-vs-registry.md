@@ -16,6 +16,7 @@
 - **Delivery and caching** → [agents-repo/registry-proxy](https://github.com/agents-repo/registry-proxy)
 
 When changing proxy path behavior, read upstream
-[specs/chat-consumption.md](https://github.com/agents-repo/registry/blob/main/specs/chat-consumption.md)
-and [specs/package-format.md](https://github.com/agents-repo/registry/blob/main/specs/package-format.md)
+[specs/chat-consumption.md](https://github.com/agents-repo/registry/blob/main/specs/chat-consumption.md),
+[specs/package-format.md](https://github.com/agents-repo/registry/blob/main/specs/package-format.md),
+and [specs/manifest-schema.md](https://github.com/agents-repo/registry/blob/main/specs/manifest-schema.md)
 before editing `src/worker.js`.

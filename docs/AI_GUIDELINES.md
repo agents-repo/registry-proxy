@@ -8,11 +8,14 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 
 1. Read [.github/copilot-instructions.md](../.github/copilot-instructions.md).
 2. Read [.cursor/rules/agents-registry-proxy.mdc](../.cursor/rules/agents-registry-proxy.mdc).
-3. Read [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md).
-4. Read [docs/CLI_WORKFLOW.md](CLI_WORKFLOW.md) for the required issue → branch →
+3. Read [docs/proxy-vs-registry.md](proxy-vs-registry.md) for registry vs proxy boundaries.
+4. Read [docs/local-validation-without-cloudflare.md](local-validation-without-cloudflare.md)
+   for local and CI validation without Cloudflare credentials.
+5. Read [.github/CONTRIBUTING.md](../.github/CONTRIBUTING.md).
+6. Read [docs/CLI_WORKFLOW.md](CLI_WORKFLOW.md) for the required issue → branch →
    push → draft PR sequence.
-5. Read [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
-6. Confirm scope from the linked issue.
+7. Read [docs/DEPLOYMENT.md](DEPLOYMENT.md) and [CONTRIBUTING.md](../CONTRIBUTING.md).
+8. Confirm scope from the linked issue.
 
 ## Registry spec dependencies
 

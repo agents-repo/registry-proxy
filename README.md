@@ -254,6 +254,8 @@ Example:
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 - [docs/CLI_WORKFLOW.md](docs/CLI_WORKFLOW.md)
 - [docs/AI_GUIDELINES.md](docs/AI_GUIDELINES.md)
+- [docs/proxy-vs-registry.md](docs/proxy-vs-registry.md)
+- [docs/local-validation-without-cloudflare.md](docs/local-validation-without-cloudflare.md)
 - Presentation slides: [docs/slides/README.md](docs/slides/README.md)
 
 ## Docs and repository pages
