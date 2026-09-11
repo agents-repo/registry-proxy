@@ -114,11 +114,11 @@ Dashboard check after deploy: Workers → `registry-proxy` → Bindings →
 ## Deploy
 
 Confirm `wrangler.jsonc` includes `account_id`, the Custom Domain route for
-`registry.agents-repo.org`, `workers_dev = false`, `preview_urls = false`,
-`upload_source_maps = true`, `[observability]` / `[observability.logs]`
-enabled with `invocation_logs = true`, and `[[d1_databases]]` binding
-`DOWNLOADS`. Do not pre-create a `registry` DNS record; Wrangler creates it on
-deploy.
+`registry.agents-repo.org`, `workers_dev` set to `false`, `preview_urls` set to
+`false`, `upload_source_maps` set to `true`, `observability` and
+`observability.logs` enabled with `invocation_logs` set to `true`, and a
+`d1_databases` entry binding `DOWNLOADS`. Do not pre-create a `registry` DNS
+record; Wrangler creates it on deploy.
 
 ```bash
 ./scripts/deploy.sh
