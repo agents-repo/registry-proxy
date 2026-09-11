@@ -18,7 +18,7 @@ CI on pull requests:
   `npm run sync:ide-instructions -- --check`, `npm run test`, and
   `npm run check:secrets`. Path-filtered extras: `npm run slides:check` when
   slide sources change; `npm run agents:ci` when registry workflow packages change.
-- **`pr-worker-validation.yml`** (when `src/**`, `scripts/**`, `wrangler.toml`,
+- **`pr-worker-validation.yml`** (when `src/**`, `scripts/**`, `wrangler.jsonc`,
   `docs/**`, or `.github/**` change): `npm run env:check`, `npm run lint:all`,
   deploy/migrate script policy checks, and `npm run check:secrets`. It does not
   run unit tests — rely on `pr-baseline.yml` for `npm run test`.

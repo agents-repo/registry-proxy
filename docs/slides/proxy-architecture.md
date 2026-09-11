@@ -112,7 +112,7 @@ GET 200 are a documented side-effect, not a new method.
 wrangler secret put GITHUB_TOKEN
 ```
 
-Never commit tokens or put them in `wrangler.toml`.
+Never commit tokens or put them in `wrangler.jsonc`.
 `wrangler secret list` confirms the name without printing the value.
 
 ---

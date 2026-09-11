@@ -6,7 +6,7 @@ on:
     paths:
       - src/**
       - scripts/**
-      - wrangler.toml
+      - wrangler.jsonc
       - docs/**
       - .github/**
 

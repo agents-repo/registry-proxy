@@ -1,10 +1,10 @@
 # Deployment
 
 Production origin is `https://registry.agents-repo.org` (Custom Domain on the
-Agents Repo Cloudflare account, `account_id` in `wrangler.toml`). Do not treat
+Agents Repo Cloudflare account, `account_id` in `wrangler.jsonc`). Do not treat
 any `*.workers.dev` URL as the catalog origin.
 
-`wrangler.toml` is the source of truth for Workers Logs, `workers_dev`, and
+`wrangler.jsonc` is the source of truth for Workers Logs, `workers_dev`, and
 preview URLs. Dashboard-only toggles are overwritten on the next
 `wrangler deploy`. This Worker pins `workers_dev = false` and
 `preview_urls = false`, so Agents Repo `registry-proxy` must not expose a
@@ -14,7 +14,7 @@ a default `workers.dev` URL on deploy — ignore it in docs and consumer default
 The personal `https://registry-proxy.maiconfz.workers.dev` URL remains live for
 existing clients. Do not redirect or decommission it as part of this Worker
 deploy. That Worker is on a different Cloudflare account and is not controlled
-by this repository's `wrangler.toml`.
+by this repository's `wrangler.jsonc`.
 
 There is no staging Worker environment. Live production is
 `https://registry.agents-repo.org` only.
@@ -48,7 +48,7 @@ npx wrangler whoami
 If it only lists a personal account, re-run `npx wrangler auth create agents-repo`
 and stop. Do not deploy until this gate passes.
 
-`account_id` in `wrangler.toml` is the failsafe: Wrangler must not fall back to
+`account_id` in `wrangler.jsonc` is the failsafe: Wrangler must not fall back to
 a personal account even if the profile can reach both.
 
 One-off override: `npx --ignore-scripts wrangler deploy --profile agents-repo`. `--profile` is
@@ -79,7 +79,7 @@ put` errors because the script does not exist yet, deploy first, then retry.
 ## D1 download counts
 
 The Worker binds D1 as `DOWNLOADS` (`registry-proxy-downloads`,
-`database_id` in `wrangler.toml`). Bindings belong in `wrangler.toml`;
+`database_id` in `wrangler.jsonc`). Bindings belong in `wrangler.jsonc`;
 dashboard-only bindings are overwritten on the next `wrangler deploy`.
 
 Create the database once (already done on the Agents Repo account):
@@ -88,7 +88,7 @@ Create the database once (already done on the Agents Repo account):
 npx wrangler d1 create registry-proxy-downloads
 ```
 
-Copy the printed `database_id` into `wrangler.toml`. Use binding name
+Copy the printed `database_id` into `wrangler.jsonc`. Use binding name
 `DOWNLOADS`, not Wrangler’s suggested `registry_proxy_downloads`.
 
 Apply migrations **before** deploying Worker code that reads the table.
@@ -113,12 +113,12 @@ Dashboard check after deploy: Workers → `registry-proxy` → Bindings →
 
 ## Deploy
 
-Confirm `wrangler.toml` includes `account_id`, the Custom Domain route for
-`registry.agents-repo.org`, `workers_dev = false`, `preview_urls = false`,
-`upload_source_maps = true`, `[observability]` / `[observability.logs]`
-enabled with `invocation_logs = true`, and `[[d1_databases]]` binding
-`DOWNLOADS`. Do not pre-create a `registry` DNS record; Wrangler creates it on
-deploy.
+Confirm `wrangler.jsonc` includes `account_id`, the Custom Domain route for
+`registry.agents-repo.org`, `workers_dev` set to `false`, `preview_urls` set to
+`false`, `upload_source_maps` set to `true`, `observability` and
+`observability.logs` enabled with `invocation_logs` set to `true`, and a
+`d1_databases` entry binding `DOWNLOADS`. Do not pre-create a `registry` DNS
+record; Wrangler creates it on deploy.
 
 ```bash
 ./scripts/deploy.sh
@@ -168,5 +168,5 @@ Deploy this endpoint before merging dependent webapp changes.
 - Re-run `npx --ignore-scripts wrangler deploy` with corrected source from this bound directory.
 - Verify the same Custom Domain endpoint set after each deployment.
 - Do not delete the personal `maiconfz.workers.dev` Worker.
-- Reverting `workers_dev = false` in `wrangler.toml` can re-enable the Agents
+- Reverting `workers_dev = false` in `wrangler.jsonc` can re-enable the Agents
   Repo workers.dev route on the next deploy.

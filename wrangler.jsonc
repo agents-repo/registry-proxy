@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "registry-proxy",
+  "account_id": "3a689fa9c8e3226495626475e5180895",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-11",
+  "workers_dev": false,
+  "preview_urls": false,
+  "upload_source_maps": true,
+  "routes": [
+    {
+      "pattern": "registry.agents-repo.org",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
+  "d1_databases": [
+    {
+      "binding": "DOWNLOADS",
+      "database_name": "registry-proxy-downloads",
+      "database_id": "dc9103bd-ca9f-4ec9-ad90-d75dd48d4622",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

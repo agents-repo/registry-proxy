@@ -162,7 +162,7 @@ Other file-proxy paths keep unbounded edge cache without worker TTL or client
 
 - Token is only read from Worker environment (`env.GITHUB_TOKEN`).
 - Token is never committed in source control or wrangler config.
-- D1 `database_id` in `wrangler.toml` is an account identifier, not a secret.
+- D1 `database_id` in `wrangler.jsonc` is an account identifier, not a secret.
   Forks on another Cloudflare account MUST create their own D1 database and
   replace `database_id`.
 
