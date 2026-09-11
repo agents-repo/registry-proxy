@@ -1,5 +1,5 @@
 ---
-applyTo: "wrangler.toml"
+applyTo: "wrangler.jsonc"
 description: "Use for Wrangler configuration updates and deployment safety constraints."
 ---
 
@@ -8,6 +8,6 @@ description: "Use for Wrangler configuration updates and deployment safety const
 - Follow `.github/CONTRIBUTING.md` **Required Workflow** (issue → branch →
   push → draft PR before implementation).
 - Keep required fields: name, main, compatibility_date.
-- Do not place token values in wrangler.toml.
+- Do not place token values in wrangler.jsonc.
 - Keep config minimal unless issue scope requires new settings.
 - Cross-check with docs/DEPLOYMENT.md when editing deploy config.

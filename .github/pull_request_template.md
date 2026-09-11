@@ -49,7 +49,7 @@ List affected paths:
 - [ ] scripts/
 - [ ] docs/
 - [ ] .github/
-- [ ] wrangler.toml
+- [ ] wrangler.jsonc
 - [ ] Root config files
 
 ## Validation Checklist
