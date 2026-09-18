@@ -756,7 +756,7 @@ async function handleProxyRoute(target, env, request, ctx) {
   );
 
   if (freshResponse) {
-    scheduleZipDownloadCount(ctx, env, target.targetPath, freshResponse.status);
+    scheduleZipDownloadCount(ctx, env, request, target.targetPath, freshResponse.status);
     return freshResponse;
   }
 
@@ -795,7 +795,7 @@ async function handleProxyRoute(target, env, request, ctx) {
   }
 
   const clientResponse = clientFileProxyResponse(response, cacheClass);
-  scheduleZipDownloadCount(ctx, env, target.targetPath, clientResponse.status);
+  scheduleZipDownloadCount(ctx, env, request, target.targetPath, clientResponse.status);
   return clientResponse;
 }
 

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DOWNLOAD_METRICS_HEADER_NAME,
   parseStatsPath,
   parseStatsPeriod,
   parseVersionedZipDownload,
@@ -128,11 +129,12 @@ test("resolveStatsResult lists packages sorted by downloads", async () => {
     },
   };
 
-  scheduleZipDownloadCount(ctx, env, ZIP_PATH, 200);
-  scheduleZipDownloadCount(ctx, env, ZIP_PATH, 200);
+  scheduleZipDownloadCount(ctx, env, null, ZIP_PATH, 200);
+  scheduleZipDownloadCount(ctx, env, null, ZIP_PATH, 200);
   scheduleZipDownloadCount(
     ctx,
     env,
+    null,
     "packages/other-ns/other-pkg/versions/2.0.0/2.0.0-cursor.zip",
     200,
   );
@@ -248,12 +250,32 @@ test("scheduleZipDownloadCount skips non-200, missing D1, and missing waitUntil"
     },
   };
 
-  scheduleZipDownloadCount(ctx, env, ZIP_PATH, 304);
-  scheduleZipDownloadCount(ctx, env, ZIP_PATH, 404);
-  scheduleZipDownloadCount(ctx, {}, ZIP_PATH, 200);
-  scheduleZipDownloadCount({}, env, ZIP_PATH, 200);
-  scheduleZipDownloadCount(null, env, ZIP_PATH, 200);
+  scheduleZipDownloadCount(ctx, env, null, ZIP_PATH, 304);
+  scheduleZipDownloadCount(ctx, env, null, ZIP_PATH, 404);
+  scheduleZipDownloadCount(ctx, {}, null, ZIP_PATH, 200);
+  scheduleZipDownloadCount({}, env, null, ZIP_PATH, 200);
+  scheduleZipDownloadCount(null, env, null, ZIP_PATH, 200);
   assert.equal(waitUntilPromises.length, 0);
+
+  const listed = await resolveStatsResult("stats", env);
+  assert.deepEqual(listed.payload.packages, []);
+});
+
+test("scheduleZipDownloadCount skips D1 when download-metrics opt-out header is set", async () => {
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+  const waitUntilPromises = [];
+  const ctx = {
+    waitUntil(promise) {
+      waitUntilPromises.push(promise);
+    },
+  };
+  const skipRequest = new Request("https://example.test/zip", {
+    headers: { [DOWNLOAD_METRICS_HEADER_NAME]: "skip" },
+  });
+
+  scheduleZipDownloadCount(ctx, env, skipRequest, ZIP_PATH, 200);
+  scheduleZipDownloadCount(ctx, env, skipRequest, ZIP_PATH, 200);
+  await Promise.all(waitUntilPromises);
 
   const listed = await resolveStatsResult("stats", env);
   assert.deepEqual(listed.payload.packages, []);

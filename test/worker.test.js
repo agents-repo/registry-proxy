@@ -1626,6 +1626,38 @@ test("fetch increments D1 on ZIP 200 cache miss and cache hit", async () => {
   }
 });
 
+test("fetch does not increment D1 on ZIP 200 when download-metrics opt-out header is set", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+
+  try {
+    globalThis.caches = caches;
+    globalThis.fetch = async () => new Response("zip-bytes", {
+      status: 200,
+      headers: { "content-type": "application/zip" },
+    });
+
+    const first = collectingWaitUntil();
+    const response = await worker.fetch(
+      new Request(`https://worker.example${ZIP_REQUEST_PATH}`, {
+        headers: { "Agents-Repo-Download-Metrics": "skip" },
+      }),
+      env,
+      first.ctx,
+    );
+    assert.equal(response.status, 200);
+    await first.flush();
+
+    const stats = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
+    assert.deepEqual(await stats.json(), { packages: [] });
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("fetch counts path-style and query-ref ZIP URLs as the same row", async () => {
   const originalCaches = globalThis.caches;
   const originalFetch = globalThis.fetch;
