@@ -1643,7 +1643,7 @@ test("fetch does not increment D1 on ZIP 200 when download-metrics opt-out heade
     const first = collectingWaitUntil();
     const response = await worker.fetch(
       new Request(`https://worker.example${ZIP_REQUEST_PATH}`, {
-        headers: { "Agents-Repo-Download-Metrics": "skip" },
+        headers: { [DOWNLOAD_METRICS_HEADER_NAME]: "skip" },
       }),
       env,
       first.ctx,
