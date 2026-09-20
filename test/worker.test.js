@@ -1635,21 +1635,31 @@ test("fetch does not increment D1 on ZIP 200 when download-metrics opt-out heade
 
   try {
     globalThis.caches = caches;
-    globalThis.fetch = async () => new Response("zip-bytes", {
-      status: 200,
-      headers: { "content-type": "application/zip" },
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response("zip-bytes", {
+        status: 200,
+        headers: { "content-type": "application/zip" },
+      });
+    };
+
+    const optOutHeaders = { [DOWNLOAD_METRICS_HEADER_NAME]: "skip" };
+    const zipRequest = () => new Request(`https://worker.example${ZIP_REQUEST_PATH}`, {
+      headers: optOutHeaders,
     });
 
     const first = collectingWaitUntil();
-    const response = await worker.fetch(
-      new Request(`https://worker.example${ZIP_REQUEST_PATH}`, {
-        headers: { [DOWNLOAD_METRICS_HEADER_NAME]: "skip" },
-      }),
-      env,
-      first.ctx,
-    );
-    assert.equal(response.status, 200);
+    const missResponse = await worker.fetch(zipRequest(), env, first.ctx);
+    assert.equal(missResponse.status, 200);
     await first.flush();
+    assert.equal(fetchCount, 1);
+
+    const second = collectingWaitUntil();
+    const hitResponse = await worker.fetch(zipRequest(), env, second.ctx);
+    assert.equal(hitResponse.status, 200);
+    await second.flush();
+    assert.equal(fetchCount, 1);
 
     const stats = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
     assert.deepEqual(await stats.json(), { packages: [] });
