@@ -26,6 +26,7 @@ import worker, {
   UPSTREAM_USER_AGENT,
   VERSIONED_CLIENT_TTL_SECONDS,
 } from "../src/worker.js";
+import { DOWNLOAD_METRICS_HEADER_NAME } from "../src/download-stats.js";
 import { createMemoryDownloadsDb } from "./memory-downloads-d1.js";
 
 test("getProxyTarget resolves tags listing route", () => {
@@ -591,7 +592,7 @@ test("fetch handles CORS preflight with OPTIONS", async () => {
   assert.equal(response.headers.get("Access-Control-Allow-Methods"), "GET, OPTIONS");
   assert.equal(
     response.headers.get("Access-Control-Allow-Headers"),
-    "Accept, If-None-Match, If-Modified-Since",
+    `Accept, If-None-Match, If-Modified-Since, ${DOWNLOAD_METRICS_HEADER_NAME}`,
   );
   assert.equal(response.headers.get("Access-Control-Max-Age"), "86400");
 });

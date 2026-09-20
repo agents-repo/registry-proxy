@@ -1,6 +1,7 @@
 import { resolvePkgProxyTarget, isSafePackageVersion, DEFAULT_REF } from "./pkg-routes.js";
 import { withResolvedContentType } from "./content-type.js";
 import {
+  DOWNLOAD_METRICS_HEADER_NAME,
   resolveStatsResult,
   scheduleZipDownloadCount,
 } from "./download-stats.js";
@@ -20,7 +21,7 @@ const KNOWN_CONTENT_ROOTS = ["packages"];
 const MAX_PATH_DECODE_PASSES = 8;
 const CORS_ALLOW_ORIGIN = "*";
 const CORS_ALLOW_METHODS = "GET, OPTIONS";
-const CORS_ALLOW_HEADERS = "Accept, If-None-Match, If-Modified-Since";
+const CORS_ALLOW_HEADERS = `Accept, If-None-Match, If-Modified-Since, ${DOWNLOAD_METRICS_HEADER_NAME}`;
 const CORS_MAX_AGE = "86400";
 const UPSTREAM_USER_AGENT = "registry-proxy-worker/0.1.0 (+https://github.com/agents-repo/registry-proxy)";
 
