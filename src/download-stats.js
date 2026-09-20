@@ -4,6 +4,10 @@ export const STATS_CLIENT_TTL_SECONDS = 60;
 
 export const STATS_PERIODS = ["all", "7d", "30d", "365d"];
 
+/** Client opt-out for versioned ZIP download metrics (automation / CI). */
+export const DOWNLOAD_METRICS_HEADER_NAME = "Agents-Repo-Download-Metrics";
+export const DOWNLOAD_METRICS_SKIP_VALUE = "skip";
+
 const ZIP_EXTENSION = ".zip";
 
 const WINDOW_ORDER_COLUMN = {
@@ -125,6 +129,19 @@ export function parseStatsPath(normalizedPath) {
   return { kind: "invalid" };
 }
 
+export function shouldSkipDownloadMetricsCount(request) {
+  if (!request?.headers) {
+    return false;
+  }
+
+  const raw = request.headers.get(DOWNLOAD_METRICS_HEADER_NAME);
+  if (raw == null) {
+    return false;
+  }
+
+  return raw.trim().toLowerCase() === DOWNLOAD_METRICS_SKIP_VALUE;
+}
+
 export async function incrementZipDownload(env, parsed) {
   await env.DOWNLOADS.prepare(`
     INSERT INTO download_events (namespace, package_id, version, target_id, downloaded_at)
@@ -137,8 +154,12 @@ export async function incrementZipDownload(env, parsed) {
   ).run();
 }
 
-export function scheduleZipDownloadCount(ctx, env, targetPath, status) {
+export function scheduleZipDownloadCount(ctx, env, request, targetPath, status) {
   if (status !== 200) {
+    return;
+  }
+
+  if (shouldSkipDownloadMetricsCount(request)) {
     return;
   }
 

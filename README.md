@@ -81,7 +81,8 @@ Scope is intentionally strict:
 1. The Worker checks `caches.default` for a cached response.
 1. On cache miss, it fetches upstream without Authorization for GitHub Raw, or with `Authorization: Bearer <GITHUB_TOKEN>` and `Accept: application/vnd.github.raw` for the Contents API.
 1. Successful upstream responses with status 200 are cached and returned to the caller.
-1. HTTP 200 versioned ZIP artifacts increment D1 download counts in the background.
+1. HTTP 200 versioned ZIP artifacts increment D1 download counts in the background,
+   unless the client sends `Agents-Repo-Download-Metrics: skip` (automation/CI opt-out).
 1. For HTTP 200 file responses, the Worker normalizes `Content-Type` from the
    requested path extension when mapped, and falls back to
    `application/octet-stream` for unmapped extensions served as

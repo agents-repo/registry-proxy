@@ -106,6 +106,9 @@ When the extension is not in the table above:
 - Counts insert on HTTP 200 versioned ZIP paths
   `packages/<namespace>/<package-id>/versions/<semver>/<semver>-<target-id>.zip`
   (cache hit and miss). Counts are ref-agnostic.
+- Clients MAY send `Agents-Repo-Download-Metrics: skip` (value `skip`, case-insensitive)
+  to skip the D1 insert while still receiving the ZIP. Intended for CI and other automation.
+  OPTIONS preflight includes this name in `Access-Control-Allow-Headers`.
 - Non-ZIP paths, 304, 4xx/5xx, and `/pkg/` resources are not counted.
 - Client `Cache-Control: public, max-age=60`. Stats responses are **not** stored
   in `caches.default`.
