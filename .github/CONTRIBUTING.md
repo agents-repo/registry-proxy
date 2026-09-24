@@ -118,12 +118,12 @@ Use the npm scripts for bulk install, update, and CI (CLI version is pinned in
 ```bash
 npm run agents:install   # bulk sync from agents.json
 npm run agents:update    # refresh within semver ranges
-npm run agents:ci        # checksum extra in pr-baseline when agents paths change
+npm run agents:verify    # checksum extra in pr-baseline when agents paths change
 ```
 
 Commit `agents.json`, `agents-lock.json`, and extracted paths (`.github/agents/`, `.cursor/skills/`, `.claude/agents/`, `.agents/skills/`). Do not hand-edit extracted package files.
 
-PR baseline runs `npm run agents:ci` only when agents definition files change
+PR baseline runs `npm run agents:verify` only when agents definition files change
 (not npm lockfiles), or when control-plane files for this extra change
 (`.github/workflows/pr-baseline.yml`, `scripts/ci-pr-path-filters.mjs`), to
 reinstall from the committed registry lock and fail on extract drift
