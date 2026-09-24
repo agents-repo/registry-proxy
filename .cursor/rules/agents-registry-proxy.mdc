@@ -74,8 +74,8 @@ Agents MUST NOT merge or push to `main`. Integration is human-only after review.
   `./scripts/migrate.sh`
   (`scripts/deploy.sh` does not apply migrations).
 
-PR baseline extras (Chrome/`slides:check` and `agents:ci`) are path-filtered.
-npm lockfiles do **not** trigger `agents:ci`. See the organization
+PR baseline extras (Chrome/`slides:check` and `agents:verify`) are path-filtered.
+npm lockfiles do **not** trigger `agents:verify`. See the organization
 [PR baseline extras (path filters)](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pr-baseline-extras-path-filters).
 
 ## Pre-ready handoff
