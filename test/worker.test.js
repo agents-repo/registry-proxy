@@ -26,6 +26,7 @@ import worker, {
   UPSTREAM_USER_AGENT,
   VERSIONED_CLIENT_TTL_SECONDS,
 } from "../src/worker.js";
+import { DOWNLOAD_METRICS_HEADER_NAME } from "../src/download-stats.js";
 import { createMemoryDownloadsDb } from "./memory-downloads-d1.js";
 
 test("getProxyTarget resolves tags listing route", () => {
@@ -591,7 +592,7 @@ test("fetch handles CORS preflight with OPTIONS", async () => {
   assert.equal(response.headers.get("Access-Control-Allow-Methods"), "GET, OPTIONS");
   assert.equal(
     response.headers.get("Access-Control-Allow-Headers"),
-    "Accept, If-None-Match, If-Modified-Since",
+    `Accept, If-None-Match, If-Modified-Since, ${DOWNLOAD_METRICS_HEADER_NAME}`,
   );
   assert.equal(response.headers.get("Access-Control-Max-Age"), "86400");
 });
@@ -1620,6 +1621,48 @@ test("fetch increments D1 on ZIP 200 cache miss and cache hit", async () => {
         downloads_365d: 2,
       }],
     });
+  } finally {
+    globalThis.caches = originalCaches;
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("fetch does not increment D1 on ZIP 200 when download-metrics opt-out header is set", async () => {
+  const originalCaches = globalThis.caches;
+  const originalFetch = globalThis.fetch;
+  const { caches } = memoryCache();
+  const env = { DOWNLOADS: createMemoryDownloadsDb() };
+
+  try {
+    globalThis.caches = caches;
+    let fetchCount = 0;
+    globalThis.fetch = async () => {
+      fetchCount += 1;
+      return new Response("zip-bytes", {
+        status: 200,
+        headers: { "content-type": "application/zip" },
+      });
+    };
+
+    const optOutHeaders = { [DOWNLOAD_METRICS_HEADER_NAME]: "skip" };
+    const zipRequest = () => new Request(`https://worker.example${ZIP_REQUEST_PATH}`, {
+      headers: optOutHeaders,
+    });
+
+    const first = collectingWaitUntil();
+    const missResponse = await worker.fetch(zipRequest(), env, first.ctx);
+    assert.equal(missResponse.status, 200);
+    await first.flush();
+    assert.equal(fetchCount, 1);
+
+    const second = collectingWaitUntil();
+    const hitResponse = await worker.fetch(zipRequest(), env, second.ctx);
+    assert.equal(hitResponse.status, 200);
+    await second.flush();
+    assert.equal(fetchCount, 1);
+
+    const stats = await worker.fetch(new Request("https://worker.example/stats"), env, { waitUntil() {} });
+    assert.deepEqual(await stats.json(), { packages: [] });
   } finally {
     globalThis.caches = originalCaches;
     globalThis.fetch = originalFetch;
