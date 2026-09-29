@@ -1,3 +1,5 @@
+<!-- Generated: .cursor/rules/agents-registry-proxy.mdc. Run npm run sync:ide-instructions -->
+
 # Registry proxy — project guidelines
 
 This repository implements a Cloudflare Worker proxy for registry assets.
@@ -85,12 +87,13 @@ Before handoff on a task branch, agents MUST complete the organization
 [Pre-ready agent handoff](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pre-ready-agent-handoff)
 norm, run **Required Validation** above, perform a self-review, and update the
 **draft** PR with evidence. Agents MUST NOT mark pull requests ready for review.
-After editing `.github/copilot-instructions.md`, run `npm run sync:ide-instructions`. See
+After editing `.cursor/rules/agents-registry-proxy.mdc` or path rules, run
+`npm run sync:ide-instructions`. See
 `docs/AI_GUIDELINES.md`
 for contributor-oriented detail.
 
 ## Cursor Cloud environment
 
 See [agents-repo/.github docs/cursor-cloud.md](https://github.com/agents-repo/.github/blob/main/docs/cursor-cloud.md).
-Path-scoped Copilot norms: `.github/instructions/`. Local `wrangler` needs
+Path-scoped rules sync to `.github/instructions/`. Local `wrangler` needs
 Cloudflare credentials; unit tests (`npm run test`) do not.

@@ -1,9 +1,9 @@
 ---
-applyTo: "wrangler.jsonc"
-description: "Use for Wrangler configuration updates and deployment safety constraints."
+description: Use for Wrangler configuration updates and deployment safety constraints.
+alwaysApply: false
+globs: wrangler.jsonc
+copilotInstructionsFile: deploy.instructions.md
 ---
-
-<!-- Generated: .cursor/rules/path-deploy.mdc. Run npm run sync:ide-instructions -->
 
 # Deployment Config Instructions
 

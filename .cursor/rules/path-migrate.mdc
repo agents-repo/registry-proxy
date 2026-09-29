@@ -1,9 +1,9 @@
 ---
-applyTo: "scripts/migrate.sh"
-description: "Use for D1 migration helper script updates."
+description: Use for D1 migration helper script updates.
+alwaysApply: false
+globs: scripts/migrate.sh
+copilotInstructionsFile: migrate.instructions.md
 ---
-
-<!-- Generated: .cursor/rules/path-migrate.mdc. Run npm run sync:ide-instructions -->
 
 # Migrate Script Instructions
 
