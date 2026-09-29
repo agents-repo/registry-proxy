@@ -97,40 +97,12 @@ npm run sync:ide-instructions
 
 Do not edit `.cursor/rules/`, `CLAUDE.md`, or `AGENTS.md` directly.
 
-### Registry workflow packages (CLI)
+### Registry workflow packages (org hub)
 
-Install and refresh catalog packages with the [agents-repo CLI](https://github.com/agents-repo/cli).
-`agents.json` points at `https://registry.agents-repo.org` (organization
-catalog proxy). The personal `https://registry-proxy.maiconfz.workers.dev` URL
-remains live for existing clients.
-
-Bootstrap only when `agents.json` is missing (one-time; use a published CLI
-release or `npm exec agents-repo -- init` after `npm ci`):
-
-```bash
-npm exec agents-repo -- init --targets github-copilot claude-code cursor openai-codex
-```
-
-Use the npm scripts for bulk install, update, and CI (CLI version is pinned in
-`package.json` / `package-lock.json`, distinct from registry packages in
-`agents-lock.json`):
-
-```bash
-npm run agents:install   # bulk sync from agents.json
-npm run agents:update    # refresh within semver ranges
-npm run agents:verify    # checksum extra in pr-baseline when agents paths change
-```
-
-Commit `agents.json`, `agents-lock.json`, and extracted paths (`.github/agents/`, `.cursor/skills/`, `.claude/agents/`, `.agents/skills/`). Do not hand-edit extracted package files.
-
-PR baseline runs `npm run agents:verify` only when agents definition files change
-(not npm lockfiles), or when control-plane files for this extra change
-(`.github/workflows/pr-baseline.yml`, `scripts/ci-pr-path-filters.mjs`), to
-reinstall from the committed registry lock and fail on extract drift
-([agents-repo/.github#32](https://github.com/agents-repo/.github/issues/32),
-[agents-repo/.github#34](https://github.com/agents-repo/.github/issues/34)).
-Chrome/`slides:check` is also a path-filtered extra. Follow the organization
-[PR baseline extras (path filters)](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pr-baseline-extras-path-filters).
+This repository does not commit `agents.json`. Shared planning/review packages
+install in [agents-repo/.github](https://github.com/agents-repo/.github). See
+[org-workspace-and-agents.md](https://github.com/agents-repo/.github/blob/main/docs/org-workspace-and-agents.md).
+PR baseline does not run `agents:verify` here; see [docs/ci.md](https://github.com/agents-repo/.github/blob/main/docs/ci.md).
 
 ## Branch Naming
 

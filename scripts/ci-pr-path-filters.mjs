@@ -23,19 +23,6 @@ export const PATH_GROUPS = {
     ],
     exclude: [],
   },
-  agents: {
-    include: [
-      'agents.json',
-      'agents-lock.json',
-      '.github/agents/**',
-      '.cursor/skills/**',
-      '.claude/agents/**',
-      '.agents/skills/**',
-      PR_BASELINE_WORKFLOW,
-      PATH_FILTER_SCRIPT,
-    ],
-    exclude: [],
-  },
 };
 
 function normalizePath(value) {

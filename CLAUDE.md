@@ -4,6 +4,15 @@
 
 This repository implements a Cloudflare Worker proxy for registry assets.
 
+## Organization workspace and registry skills
+
+No repo-root `agents.json`. For shared planning/review skills, open
+[agents-repo.code-workspace](https://github.com/agents-repo/.github/blob/main/agents-repo.code-workspace)
+from the `.github` sibling clone —
+[org-workspace-and-agents.md](https://github.com/agents-repo/.github/blob/main/docs/org-workspace-and-agents.md).
+
+**Issues** for proxy work: **this** repository (`agents-repo/registry-proxy`).
+
 ## Before Coding (Required)
 
 1. Read [docs/AI_GUIDELINES.md](docs/AI_GUIDELINES.md).
@@ -69,8 +78,7 @@ Agents MUST NOT merge or push to `main`. Integration is human-only after review.
   `./scripts/migrate.sh`
   (`scripts/deploy.sh` does not apply migrations).
 
-PR baseline extras (Chrome/`slides:check` and `agents:verify`) are path-filtered.
-npm lockfiles do **not** trigger `agents:verify`. See the organization
+PR baseline extras (Chrome/`slides:check` only) are path-filtered. See the organization
 [PR baseline extras (path filters)](https://github.com/agents-repo/.github/blob/main/CONTRIBUTING.md#pr-baseline-extras-path-filters).
 
 ## Pre-ready handoff
