@@ -13,7 +13,6 @@ jobs:
       pull-requests: read
     outputs:
       slides: ${{ steps.match.outputs.slides }}
-      agents: ${{ steps.match.outputs.agents }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -60,25 +59,6 @@ jobs:
       - name: Skip slide PDF check
         if: needs.changes.outputs.slides != 'true'
         run: echo "Skipping slides:check; PR paths do not match the slides group (docs/slides/**, scripts/slides.mjs, npm lockfiles, .github/workflows/pr-baseline.yml, or scripts/ci-pr-path-filters.mjs)."
-
-      - name: Verify agents lock and committed extracts
-        if: needs.changes.outputs.agents == 'true'
-        run: |
-          npm run agents:verify
-          drift_paths=(
-            agents.json
-            agents-lock.json
-            .github/agents
-            .cursor/skills
-            .claude/agents
-            .agents/skills
-          )
-          git diff --exit-code -- "${drift_paths[@]}"
-          test -z "$(git status --porcelain -- "${drift_paths[@]}")"
-
-      - name: Skip agents verify
-        if: needs.changes.outputs.agents != 'true'
-        run: echo "Skipping agents:verify; PR paths do not match agents definition files (agents.json, agents-lock.json, extracted agent paths, pr-baseline.yml, or scripts/ci-pr-path-filters.mjs). npm lockfiles alone do not trigger this step."
 
       - name: Run tests
         run: npm run test

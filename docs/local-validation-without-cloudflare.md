@@ -17,7 +17,8 @@ CI on pull requests:
 - **`pr-baseline.yml`** (every PR): `npm run env:check`, `npm run lint:all`,
   `npm run sync:ide-instructions -- --check`, `npm run test`, and
   `npm run check:secrets`. Path-filtered extras: `npm run slides:check` when
-  slide sources change; `npm run agents:verify` when registry workflow packages change.
+  slide sources change. Registry workflow catalog CI (`agents:verify`) runs only on
+  **agents-repo/.github** and **agents-repo/registry** — not on registry-proxy.
 - **`pr-worker-validation.yml`** (when `src/**`, `scripts/**`, `wrangler.jsonc`,
   `docs/**`, or `.github/**` change): `npm run env:check`, `npm run lint:all`,
   deploy/migrate script policy checks, and `npm run check:secrets`. It does not
