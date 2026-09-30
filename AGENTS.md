@@ -71,7 +71,7 @@ Agents MUST NOT merge or push to `main`. Integration is human-only after review.
 Before editing `scripts/sync-ide-instructions.mjs` or other copies shared across
 platform repos, read the
 [org AI static-analysis guide](https://github.com/agents-repo/.github/blob/main/docs/ai-static-analysis-patterns.md)
-and run `npm run dup:check` locally when duplication risk is high (not CI yet).
+and run `npm run dup:check` when duplication risk is high (also enforced in PR baseline CI).
 
 ## Required Validation
 
