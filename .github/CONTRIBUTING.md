@@ -74,7 +74,8 @@ for shared norms.
 
 Use `gh` CLI for issue and pull request communication when possible.
 
-Repo-wide instructions live in `.github/copilot-instructions.md`. Path-scoped
+Repo-wide instructions live in `.cursor/rules/agents-registry-proxy.mdc`. Path-scoped
+rules sync to `.github/instructions/*.instructions.md` for GitHub Copilot. Path-scoped
 GitHub Copilot instructions under `.github/instructions/*.instructions.md` remain in
 effect for matching files and supplement the repo-wide guide.
 
@@ -84,18 +85,18 @@ effect for matching files and supplement the repo-wide guide.
 
 | Install target | Path | Source |
 | --- | --- | --- |
-| GitHub Copilot | `.github/copilot-instructions.md` | **Canonical** — edit here |
-| Cursor | `.cursor/rules/agents-registry-proxy.mdc` | Mirrored from copilot-instructions |
-| Claude Code | `CLAUDE.md` | Mirrored from copilot-instructions |
-| OpenAI Codex | `AGENTS.md` | Mirrored from copilot-instructions |
+| Cursor | `.cursor/rules/agents-registry-proxy.mdc` (+ path `*.mdc`) | **Canonical** — edit here |
+| GitHub Copilot | `.github/copilot-instructions.md`, `.github/instructions/*` | Generated |
+| Claude Code | `CLAUDE.md` | Generated |
+| OpenAI Codex | `AGENTS.md` | Generated |
 
-Regenerate mirrors after editing `copilot-instructions.md`:
+Regenerate mirrors after editing `.cursor/rules/`:
 
 ```bash
 npm run sync:ide-instructions
 ```
 
-Do not edit `.cursor/rules/`, `CLAUDE.md`, or `AGENTS.md` directly.
+Do not edit `.github/copilot-instructions.md`, `CLAUDE.md`, or `AGENTS.md` directly.
 
 ### Registry workflow packages (org hub)
 

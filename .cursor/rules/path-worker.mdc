@@ -1,9 +1,9 @@
 ---
-applyTo: "src/worker.js"
-description: "Use for Worker proxy implementation and updates."
+description: Use for Worker proxy implementation and updates.
+alwaysApply: false
+globs: src/worker.js
+copilotInstructionsFile: worker.instructions.md
 ---
-
-<!-- Generated: .cursor/rules/path-worker.mdc. Run npm run sync:ide-instructions -->
 
 # Worker Instructions
 

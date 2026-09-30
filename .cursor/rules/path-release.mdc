@@ -1,9 +1,9 @@
 ---
-applyTo: "scripts/deploy.sh"
-description: "Use for deployment helper script updates."
+description: Use for deployment helper script updates.
+alwaysApply: false
+globs: scripts/deploy.sh
+copilotInstructionsFile: release.instructions.md
 ---
-
-<!-- Generated: .cursor/rules/path-release.mdc. Run npm run sync:ide-instructions -->
 
 # Release Script Instructions
 

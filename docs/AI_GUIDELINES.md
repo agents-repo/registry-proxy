@@ -6,7 +6,7 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 
 ## Before You Implement
 
-1. Read [.github/copilot-instructions.md](../.github/copilot-instructions.md).
+1. Read [.cursor/rules/agents-registry-proxy.mdc](../.cursor/rules/agents-registry-proxy.mdc).
 2. Read [.cursor/rules/agents-registry-proxy.mdc](../.cursor/rules/agents-registry-proxy.mdc).
 3. Read [docs/proxy-vs-registry.md](proxy-vs-registry.md) for registry vs proxy boundaries.
 4. Read [docs/local-validation-without-cloudflare.md](local-validation-without-cloudflare.md)
@@ -44,7 +44,7 @@ See [docs/proxy-vs-registry.md](proxy-vs-registry.md) and
   pull request ready for review; agents must not mark pull requests ready for
   review.
 
-After editing `.github/copilot-instructions.md`, regenerate IDE instruction mirrors:
+After editing `.cursor/rules/`, regenerate IDE instruction mirrors:
 
 ```bash
 npm run sync:ide-instructions
@@ -69,7 +69,7 @@ Required command baseline:
 - `npm run test`
 
 For worker routing or caching changes, also run the endpoint and cache checks
-listed in `.github/copilot-instructions.md` **Required Validation** (in addition
+listed in `.cursor/rules/agents-registry-proxy.mdc` **Required Validation** (in addition
 to the command baseline above).
 
 ## Pre-ready handoff
