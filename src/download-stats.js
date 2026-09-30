@@ -1,4 +1,5 @@
 import { isSafePackageVersion } from "./pkg-routes.js";
+import { isSafePathSegment } from "./path-segments.js";
 
 export const STATS_CLIENT_TTL_SECONDS = 60;
 
@@ -16,22 +17,6 @@ const WINDOW_ORDER_COLUMN = {
   "30d": "downloads_30d",
   "365d": "downloads_365d",
 };
-
-function segmentContainsPathSeparatorEncoding(segment) {
-  return /%2[fF]|%5[cC]/.test(segment);
-}
-
-function isSafeStatsSegment(segment) {
-  if (!segment || segment === "." || segment === "..") {
-    return false;
-  }
-
-  if (segment.includes("/") || segment.includes("\\")) {
-    return false;
-  }
-
-  return !segmentContainsPathSeparatorEncoding(segment);
-}
 
 function trimTrailingSlashes(value) {
   let end = value.length;
@@ -75,7 +60,7 @@ export function parseVersionedZipDownload(targetPath) {
   const version = segments[4];
   const filename = segments[5];
 
-  if (!isSafeStatsSegment(namespace) || !isSafeStatsSegment(packageId)) {
+  if (!isSafePathSegment(namespace) || !isSafePathSegment(packageId)) {
     return null;
   }
 
@@ -93,7 +78,7 @@ export function parseVersionedZipDownload(targetPath) {
   }
 
   const targetId = filename.slice(prefix.length, filename.length - ZIP_EXTENSION.length);
-  if (!isSafeStatsSegment(targetId)) {
+  if (!isSafePathSegment(targetId)) {
     return null;
   }
 
@@ -119,7 +104,7 @@ export function parseStatsPath(normalizedPath) {
   ) {
     const namespace = segments[2];
     const packageId = segments[3];
-    if (!isSafeStatsSegment(namespace) || !isSafeStatsSegment(packageId)) {
+    if (!isSafePathSegment(namespace) || !isSafePathSegment(packageId)) {
       return { kind: "invalid" };
     }
 
