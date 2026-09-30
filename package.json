@@ -20,7 +20,8 @@
     "test": "npm run test:sync && node --test 'test/**/*.test.js'",
     "release": "semantic-release",
     "release:dry-run": "semantic-release --dry-run",
-    "prepare": "husky"
+    "prepare": "husky",
+    "dup:check": "jscpd --config .jscpd.json ."
   },
   "engines": {
     "node": "24.18.0"
@@ -38,6 +39,7 @@
     "globals": "^17.7.0",
     "husky": "^9.1.7",
     "js-yaml": "^4.3.1",
+    "jscpd": "^4.3.0",
     "markdownlint-cli2": "^0.23.2",
     "semantic-release": "^25.0.6"
   },
