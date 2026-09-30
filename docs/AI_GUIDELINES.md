@@ -6,6 +6,9 @@ Keep AI-assisted implementation predictable, safe, and easy to review.
 
 ## Before You Implement
 
+For Sonar/ESLint patterns and local `npm run dup:check`, see the
+[org AI static-analysis guide](https://github.com/agents-repo/.github/blob/main/docs/ai-static-analysis-patterns.md).
+
 1. Read [.cursor/rules/agents-registry-proxy.mdc](../.cursor/rules/agents-registry-proxy.mdc).
 2. Read [.cursor/rules/agents-registry-proxy.mdc](../.cursor/rules/agents-registry-proxy.mdc).
 3. Read [docs/proxy-vs-registry.md](proxy-vs-registry.md) for registry vs proxy boundaries.
