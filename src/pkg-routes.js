@@ -4,24 +4,10 @@ const AGENTS_DIR = "agents";
 const FLOWS_DIR = "flows";
 const PACKAGE_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
+import { isSafePathSegment, segmentContainsPathSeparatorEncoding } from "./path-segments.js";
+
 /** Default Git ref when query `ref` is omitted. */
 export const DEFAULT_REF = "main";
-
-function segmentContainsPathSeparatorEncoding(segment) {
-  return /%2[fF]|%5[cC]/.test(segment);
-}
-
-function isSafePathSegment(segment) {
-  if (!segment || segment === "." || segment === "..") {
-    return false;
-  }
-
-  if (segment.includes("/") || segment.includes("\\")) {
-    return false;
-  }
-
-  return !segmentContainsPathSeparatorEncoding(segment);
-}
 
 export function isSafePackageVersion(version) {
   if (!isSafePathSegment(version)) {
