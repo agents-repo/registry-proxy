@@ -29,6 +29,9 @@ jobs:
     needs: changes
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Bootstrap registry proxy CI
         uses: ./.github/actions/proxy-ci-bootstrap
 

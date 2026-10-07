@@ -24,6 +24,9 @@ jobs:
     name: Validate Release Inputs
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Bootstrap registry proxy CI
         uses: ./.github/actions/proxy-ci-bootstrap
 
@@ -39,43 +42,29 @@ jobs:
   release-dry-run:
     name: Release Dry Run
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
     needs:
       - validate
     permissions:
       contents: read
-    steps:
-      - name: Bootstrap registry proxy CI
-        uses: ./.github/actions/proxy-ci-bootstrap
-        with:
-          fetch-depth: '0'
-          validate-runtime: 'false'
-
-      - name: Run semantic-release dry run
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run release:dry-run
+    uses: ./.github/workflows/reusable-semantic-release.yml
+    with:
+      mode: dry-run
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-publish:
     name: Publish GitHub Release
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'false' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
     needs:
       - validate
     permissions:
       contents: write
       issues: write
       pull-requests: write
-    steps:
-      - name: Bootstrap registry proxy CI
-        uses: ./.github/actions/proxy-ci-bootstrap
-        with:
-          fetch-depth: '0'
-          validate-runtime: 'false'
-
-      - name: Run semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run release
+    uses: ./.github/workflows/reusable-semantic-release.yml
+    with:
+      mode: publish
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
