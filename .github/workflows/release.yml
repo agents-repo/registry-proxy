@@ -24,14 +24,8 @@ jobs:
     name: Validate Release Inputs
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node and pinned npm
-        uses: ./.github/actions/setup-node-pinned-npm
-
-      - name: Validate runtime
-        run: npm run env:check
+      - name: Bootstrap registry proxy CI
+        uses: ./.github/actions/proxy-ci-bootstrap
 
       - name: Run baseline checks
         run: npm run lint:all
@@ -51,13 +45,11 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Bootstrap registry proxy CI
+        uses: ./.github/actions/proxy-ci-bootstrap
         with:
-          fetch-depth: 0
-
-      - name: Setup Node and pinned npm
-        uses: ./.github/actions/setup-node-pinned-npm
+          fetch-depth: '0'
+          validate-runtime: 'false'
 
       - name: Run semantic-release dry run
         env:
@@ -77,13 +69,11 @@ jobs:
       issues: write
       pull-requests: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - name: Bootstrap registry proxy CI
+        uses: ./.github/actions/proxy-ci-bootstrap
         with:
-          fetch-depth: 0
-
-      - name: Setup Node and pinned npm
-        uses: ./.github/actions/setup-node-pinned-npm
+          fetch-depth: '0'
+          validate-runtime: 'false'
 
       - name: Run semantic-release
         env:
