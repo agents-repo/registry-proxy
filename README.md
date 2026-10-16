@@ -209,6 +209,12 @@ aggregates those events (no hourly rollup).
 Migration `0002` drops undated `download_counts` and creates `download_events`.
 Apply it **before** deploying this Worker. That reset is intentional (no backfill).
 
+CLI clients: only `agents-repo ci` sends `Agents-Repo-Download-Metrics: skip`.
+`install`, `update`, `doctor`, and `remove` count on registry ZIP GETs when the
+CLI performs a network fetch (local artifact cache hits do not contact this
+Worker). Normative matrix:
+[agents-repo/cli `specs/command-contracts.md`](https://github.com/agents-repo/cli/blob/main/specs/command-contracts.md#download-metrics-registry-proxy).
+
 Example:
 
 ```bash
