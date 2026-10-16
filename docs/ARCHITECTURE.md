@@ -107,7 +107,9 @@ When the extension is not in the table above:
   `packages/<namespace>/<package-id>/versions/<semver>/<semver>-<target-id>.zip`
   (cache hit and miss). Counts are ref-agnostic.
 - Clients MAY send `Agents-Repo-Download-Metrics: skip` (value `skip`, case-insensitive)
-  to skip the D1 insert while still receiving the ZIP. Intended for CI and other automation.
+  to skip the D1 insert while still receiving the ZIP. The agents-repo CLI sends this header
+  only for `agents-repo ci`; see
+  [CLI command-contracts](https://github.com/agents-repo/cli/blob/main/specs/command-contracts.md#download-metrics-registry-proxy).
   OPTIONS preflight includes this name in `Access-Control-Allow-Headers`.
 - Non-ZIP paths, 304, 4xx/5xx, and `/pkg/` resources are not counted.
 - Client `Cache-Control: public, max-age=60`. Stats responses are **not** stored
@@ -179,5 +181,6 @@ Other file-proxy paths keep unbounded edge cache without worker TTL or client
   file cache**.
 - Download counts are a traffic counter, not anti-fraud. Repeated GETs, crawlers,
   and client retries after HTTP 200 can inflate totals. Direct GitHub Raw
-  downloads and CLI local cache hits are not counted.
+  downloads and CLI local cache hits are not counted (npm-style client cache;
+  see [CLI artifact-cache spec](https://github.com/agents-repo/cli/blob/main/specs/artifact-cache.md#download-metrics)).
 - `/stats` may lag event inserts by up to 60 seconds (`Cache-Control: max-age=60`).
